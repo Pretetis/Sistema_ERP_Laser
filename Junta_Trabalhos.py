@@ -1,4 +1,4 @@
-def carregar_trabalhos(pasta=r"C:\Users\Microns\Desktop\Macros\ERP\Programas_Prontos"):
+def carregar_trabalhos(pasta=r"Programas_Prontos"):
     from pathlib import Path
     import pandas as pd
     registros = []
