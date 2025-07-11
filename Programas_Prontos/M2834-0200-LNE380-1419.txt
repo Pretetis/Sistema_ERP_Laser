@@ -1,0 +1,8 @@
+Proposta: M2834
+Espessura (mm): 2.0
+Material: LNE380
+Programador: Felipe
+Qtd Chapas: 1
+Tempo Total: 00:01:12.44
+CNC: 1419
+Caminho: C:\Users\Microns\Desktop\Macros\ERP\CNC\1419.pdf
