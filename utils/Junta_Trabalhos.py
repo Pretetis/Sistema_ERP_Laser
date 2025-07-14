@@ -4,6 +4,14 @@ def carregar_trabalhos(pasta="autorizados"):
 
     registros = []
 
+    pasta_path = Path(pasta)
+    if not pasta_path.exists():
+        return []
+
+    arquivos_txt = list(pasta_path.glob("*.txt"))
+    if not arquivos_txt:
+        return []
+
     for txt in Path(pasta).glob("*.txt"):
         partes = txt.stem.split("-")
         if len(partes) == 3:
