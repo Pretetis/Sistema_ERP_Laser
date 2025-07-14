@@ -8,6 +8,11 @@ from utils.db import (
 
 MAQUINAS = ["LASER 1", "LASER 2", "LASER 3", "LASER 4", "LASER 5", "LASER 6"]
 
+from streamlit_autorefresh import st_autorefresh
+
+# Atualiza automaticamente a cada 7 segundos
+st_autorefresh(interval=7000, key="data_refresh")
+
 criar_banco()
 st.set_page_config(page_title="Gestão de Corte", layout="wide")
 st.title("🛠️ Gestão de Produção")
