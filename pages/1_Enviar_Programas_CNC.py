@@ -71,7 +71,7 @@ if st.button("📥 Processar PDFs"):
             linhas.append("")
 
         conteudo = "\n".join(linhas)
-        caminho_txt = PASTA_TXT_PRONTOS / f"{chave}.txt"
+        caminho_txt = PASTA_TXT_PRONTOS / f"{chave}-{item['CNC']}.txt"
         with open(caminho_txt, "w", encoding="utf-8") as f:
             f.write(conteudo)
 
