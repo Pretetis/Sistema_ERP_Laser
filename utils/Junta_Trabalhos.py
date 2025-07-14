@@ -1,4 +1,4 @@
-def carregar_trabalhos(pasta=r"autorizados"):
+def carregar_trabalhos(pasta=r"pages/autorizados"):
     from pathlib import Path
     import pandas as pd
     registros = []

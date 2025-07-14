@@ -1,8 +1,0 @@
-Proposta: M3020
-Espessura (mm): 6.35
-Material: A36
-Programador: Felipe
-Qtd Chapas: 1
-Tempo Total: 00:00:33.39
-CNC: 1648
-Caminho: C:\Users\Microns\Desktop\Macros\ERP\CNC\1648.pdf

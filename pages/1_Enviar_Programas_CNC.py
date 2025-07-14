@@ -1,14 +1,19 @@
 import streamlit as st
 from pathlib import Path
+import sys
+sys.path.append(str(Path(__file__).resolve().parent.parent))
 from utils.extracao import extrair_dados_por_posicao
 import shutil
 
-# Pastas de trabalho
-PASTA_PDF = Path("CNC")
-PASTA_TXT_PRONTOS = Path("Programas_Prontos")
-PASTA_AUTORIZADOS = Path("autorizados")
+# Caminho absoluto da pasta raiz (um nível acima de /pages)
+RAIZ = Path(__file__).resolve().parent.parent
 
-# Criar pastas se não existirem
+# Pastas de trabalho na raiz do projeto
+PASTA_PDF = RAIZ / "CNC"
+PASTA_TXT_PRONTOS = RAIZ / "Programas_Prontos"
+PASTA_AUTORIZADOS = RAIZ / "autorizados"
+
+# Garante que as pastas existam
 PASTA_PDF.mkdir(exist_ok=True)
 PASTA_TXT_PRONTOS.mkdir(exist_ok=True)
 PASTA_AUTORIZADOS.mkdir(exist_ok=True)
