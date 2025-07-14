@@ -2,4 +2,8 @@ Programador: Felipe
 CNC: 1413
 Qtd Chapas: 1
 Tempo Total: 00:02:44.87
+<<<<<<< HEAD
 Caminho: C:\Users\Microns\Desktop\Sistema_ERP_Laser - Copia\CNC\1413.pdf
+=======
+Caminho: C:\Users\Microns\Desktop\Sistema_ERP_Laser\CNC\1413.pdf
+>>>>>>> 544c2c5003fb294e418b1799572d307e3b8cf94f
