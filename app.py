@@ -20,7 +20,6 @@ st.title("🛠️ Gestão de Produção")
 # =====================
 # Sidebar - Trabalhos Agrupados
 # =====================
-st.sidebar.page_link("pages/1_Enviar_Programas_CNC.py")
 st.sidebar.title("📋 Trabalhos Agrupados")
 trabalhos = carregar_trabalhos()
 
