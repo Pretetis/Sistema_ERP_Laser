@@ -1,0 +1,11 @@
+Programador: Felipe
+CNC: 1616
+Qtd Chapas: 2
+Tempo Total: 00:34:43.22
+Caminho: C:\Users\Microns\Desktop\Sistema_ERP_Laser\CNC\1616.pdf
+
+Programador: Felipe
+CNC: 1617
+Qtd Chapas: 2
+Tempo Total: 00:40:19.17
+Caminho: C:\Users\Microns\Desktop\Sistema_ERP_Laser\CNC\1617.pdf

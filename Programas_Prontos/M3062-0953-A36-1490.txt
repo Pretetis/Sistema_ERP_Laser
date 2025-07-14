@@ -1,0 +1,8 @@
+Proposta: M3062
+Espessura (mm): 9.53
+Material: A36
+Programador: Felipe
+Qtd Chapas: 1
+Tempo Total: 00:12:53.87
+CNC: 1490
+Caminho: C:\Users\Microns\Desktop\Sistema_ERP_Laser\CNC\1490.pdf
