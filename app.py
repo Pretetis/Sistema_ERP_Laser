@@ -28,7 +28,7 @@ st.title("🛠️ Gestão de Produção")
 # Sidebar - Trabalhos Agrupados
 # =====================
 st.sidebar.title("📋 Trabalhos Agrupados")
-trabalhos = carregar_trabalhos()
+trabalhos = carregar_trabalhos(pasta="autorizados")
 
 for trabalho in trabalhos:
     with st.sidebar.expander(

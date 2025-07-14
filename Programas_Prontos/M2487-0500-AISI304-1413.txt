@@ -1,8 +1,0 @@
-Proposta: M2487
-Espessura (mm): 5.0
-Material: AISI304
-Programador: Felipe
-Qtd Chapas: 1
-Tempo Total: 00:02:44.87
-CNC: 1413
-Caminho: C:\Users\Microns\Desktop\Sistema_ERP_Laser\CNC\1413.pdf
