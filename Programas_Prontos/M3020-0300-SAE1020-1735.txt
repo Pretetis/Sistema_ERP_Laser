@@ -1,0 +1,8 @@
+Proposta: M3020
+Espessura (mm): 3.0
+Material: SAE1020
+Programador: Felipe
+Qtd Chapas: 1
+Tempo Total: 00:03:35.69
+CNC: 1735
+Caminho: C:\Users\Microns\Desktop\Sistema_ERP_Laser\CNC\1735.pdf

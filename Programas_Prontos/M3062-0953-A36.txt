@@ -1,4 +1,10 @@
 Programador: Felipe
+CNC: 1488
+Qtd Chapas: 1
+Tempo Total: 00:39:49.65
+Caminho: C:\Users\Microns\Desktop\Sistema_ERP_Laser\CNC\1488.pdf
+
+Programador: Felipe
 CNC: 1489
 Qtd Chapas: 1
 Tempo Total: 00:06:22.28
@@ -9,9 +15,3 @@ CNC: 1490
 Qtd Chapas: 1
 Tempo Total: 00:12:53.87
 Caminho: C:\Users\Microns\Desktop\Sistema_ERP_Laser\CNC\1490.pdf
-
-Programador: Felipe
-CNC: 1488
-Qtd Chapas: 1
-Tempo Total: 00:39:49.65
-Caminho: C:\Users\Microns\Desktop\Sistema_ERP_Laser\CNC\1488.pdf

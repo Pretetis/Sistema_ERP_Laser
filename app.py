@@ -13,6 +13,13 @@ from streamlit_autorefresh import st_autorefresh
 # Atualiza automaticamente a cada 7 segundos
 st_autorefresh(interval=7000, key="data_refresh")
 
+from utils.navegacao import barra_navegacao
+
+st.set_page_config(page_title="Minha Página", layout="wide")
+
+barra_navegacao()  # Exibe a barra no topo
+
+
 criar_banco()
 st.set_page_config(page_title="Gestão de Corte", layout="wide")
 st.title("🛠️ Gestão de Produção")
