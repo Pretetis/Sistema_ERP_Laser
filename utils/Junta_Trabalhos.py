@@ -1,4 +1,4 @@
-def carregar_trabalhos(pasta=r"Programas_Prontos"):
+def carregar_trabalhos(pasta=r"autorizados"):
     from pathlib import Path
     import pandas as pd
     registros = []
