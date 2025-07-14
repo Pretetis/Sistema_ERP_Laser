@@ -1,0 +1,8 @@
+Proposta: M3011
+Espessura (mm): 3.0
+Material: AISI304
+Programador: Felipe
+Qtd Chapas: 2
+Tempo Total: 00:34:43.22
+CNC: 1616
+Caminho: C:\Users\Microns\Desktop\Sistema_ERP_Laser - Copia\CNC\1616.pdf

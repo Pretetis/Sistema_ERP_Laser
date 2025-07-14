@@ -3,6 +3,7 @@ from pathlib import Path
 import sys
 import shutil
 import pandas as pd
+from pathlib import Path
 
 # Adiciona caminho do projeto para importar corretamente
 sys.path.append(str(Path(__file__).resolve().parent.parent))
@@ -10,6 +11,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 from utils.extracao import extrair_dados_por_posicao
 from utils.Junta_Trabalhos import carregar_trabalhos
 from utils.navegacao import barra_navegacao
+from utils.visualizacao import gerar_preview_pdf
 
 st.set_page_config(page_title="Minha Página", layout="wide")
 
@@ -71,7 +73,7 @@ if st.button("📥 Processar PDFs"):
             linhas.append("")
 
         conteudo = "\n".join(linhas)
-        caminho_txt = PASTA_TXT_PRONTOS / f"{chave}-{item['CNC']}.txt"
+        caminho_txt = PASTA_TXT_PRONTOS / f"{chave}.txt"  # ✅ sem CNC no nome
         with open(caminho_txt, "w", encoding="utf-8") as f:
             f.write(conteudo)
 
@@ -92,11 +94,27 @@ else:
         with st.expander(
             f"🔹 {trabalho['Proposta']} | {trabalho['Espessura']} mm | {trabalho['Material']} | x {trabalho['Qtd Total']} | ⏱ {trabalho['Tempo Total']}"
         ):
-            st.dataframe(
-                pd.DataFrame(trabalho["Detalhes"])[["Programador", "CNC", "Qtd Chapas", "Tempo Total", "Caminho PDF"]],
-                use_container_width=True,
-                hide_index=True,
-            )
+            for item in trabalho["Detalhes"]:
+                with st.container(border=True):
+                    col1, col2 = st.columns([2, 2])
+
+                    with col1:
+                        st.markdown(f"**Programador:** {item['Programador']}")
+                        st.markdown(f"**CNC:** {item['CNC']}")
+                        st.markdown(f"**Qtd Chapas:** {item['Qtd Chapas']}")
+                        st.markdown(f"**Tempo Total:** {item['Tempo Total']}")
+
+                    with col2:
+                        caminho_pdf = item.get("Caminho PDF") or item.get("Caminho")
+                        if caminho_pdf and Path(caminho_pdf).exists():
+                            preview_path = gerar_preview_pdf(caminho_pdf)
+                            if preview_path:
+                                st.image(preview_path, caption=f"CNC {item['CNC']}", use_column_width="auto")
+                            else:
+                                st.warning("Erro ao gerar preview.")
+                        else:
+                            st.warning("Arquivo PDF não encontrado.")
+
 
             col1, col2 = st.columns(2)
             with col1:

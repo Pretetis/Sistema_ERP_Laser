@@ -31,7 +31,10 @@ def carregar_trabalhos(pasta="autorizados"):
                         "Caminho PDF": dados.get("Caminho", "")
                     })
 
-    df = pd.DataFrame(registros)
+    df = pd.DataFrame(registros)   
+    if df.empty:
+        return []
+    
     trabalhos = []
 
     for grupo_nome, subdf in df.groupby("Grupo"):

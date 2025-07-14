@@ -1,10 +1,13 @@
 import streamlit as st
+from pathlib import Path
 import pandas as pd
 from utils.Junta_Trabalhos import carregar_trabalhos
 from utils.db import (
     criar_banco, adicionar_na_fila, obter_fila,
     obter_corte_atual, iniciar_corte, finalizar_corte
 )
+from utils.visualizacao import gerar_preview_pdf
+
 
 MAQUINAS = ["LASER 1", "LASER 2", "LASER 3", "LASER 4", "LASER 5", "LASER 6"]
 
@@ -30,15 +33,35 @@ st.title("🛠️ Gestão de Produção")
 st.sidebar.title("📋 Trabalhos Agrupados")
 trabalhos = carregar_trabalhos(pasta="autorizados")
 
+if not trabalhos:
+    st.info("Nenhum trabalho pendente no momento.")
+    
 for trabalho in trabalhos:
     with st.sidebar.expander(
         f"🔹 {trabalho['Proposta']} | {trabalho['Espessura']} mm | {trabalho['Material']} | x {trabalho['Qtd Total']} | ⏱ {trabalho['Tempo Total']}"
     ):
-        st.dataframe(
-            pd.DataFrame(trabalho["Detalhes"])[["Programador", "CNC", "Qtd Chapas", "Tempo Total", "Caminho PDF"]],
-            use_container_width=True,
-            hide_index=True,
-        )
+
+        for item in trabalho["Detalhes"]:
+            with st.container(border=True):
+                col1, col2 = st.columns([2, 2])
+
+                with col1:
+                    st.markdown(f"**Programador:** {item['Programador']}")
+                    st.markdown(f"**CNC:** {item['CNC']}")
+                    st.markdown(f"**Qtd Chapas:** {item['Qtd Chapas']}")
+                    st.markdown(f"**Tempo Total:** {item['Tempo Total']}")
+
+                with col2:
+                    caminho_pdf = item.get("Caminho PDF") or item.get("Caminho")
+                    if caminho_pdf and Path(caminho_pdf).exists():
+                        preview_path = gerar_preview_pdf(caminho_pdf)
+                        if preview_path:
+                            st.image(preview_path, caption=f"CNC {item['CNC']}", use_column_width="auto")
+                        else:
+                            st.warning("Erro ao gerar preview.")
+                    else:
+                        st.warning("Arquivo PDF não encontrado.")
+
         maquina_escolhida = st.selectbox("Enviar para:", MAQUINAS, key=f"sel_maquina_{trabalho['Grupo']}")
         if st.button("➕ Adicionar à máquina", key=f"btn_{trabalho['Grupo']}"):
             for item in trabalho["Detalhes"]:
@@ -50,7 +73,15 @@ for trabalho in trabalhos:
                     "Quantidade": item["Qtd Chapas"],
                     "Tempo Total": item["Tempo Total"]
                 })
+
+            # 🔴 Remove o arquivo do grupo após o envio
+            from pathlib import Path
+            caminho_txt = Path("autorizados") / f"{trabalho['Grupo']}.txt"
+            if caminho_txt.exists():
+                caminho_txt.unlink()
+
             st.success(f"Trabalho enviado para {maquina_escolhida}")
+            st.rerun()
 
 # =====================
 # Painel Principal - Máquinas
