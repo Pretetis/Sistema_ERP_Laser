@@ -1,17 +1,14 @@
 import streamlit as st
 import pandas as pd
-from collections import defaultdict
-from Junta_Trabalhos import carregar_trabalhos
+from utils.Junta_Trabalhos import carregar_trabalhos
+from utils.db import (
+    criar_banco, adicionar_na_fila, obter_fila,
+    obter_corte_atual, iniciar_corte, finalizar_corte
+)
 
-# Define máquinas disponíveis
 MAQUINAS = ["LASER 1", "LASER 2", "LASER 3", "LASER 4", "LASER 5", "LASER 6"]
 
-# Inicialização do estado
-if "fila_maquinas" not in st.session_state:
-    st.session_state.fila_maquinas = defaultdict(list)
-if "corte_atual" not in st.session_state:
-    st.session_state.corte_atual = {}
-
+criar_banco()
 st.set_page_config(page_title="Gestão de Corte", layout="wide")
 st.title("🛠️ Gestão de Produção")
 
@@ -33,7 +30,7 @@ for trabalho in trabalhos:
         maquina_escolhida = st.selectbox("Enviar para:", MAQUINAS, key=f"sel_maquina_{trabalho['Grupo']}")
         if st.button("➕ Adicionar à máquina", key=f"btn_{trabalho['Grupo']}"):
             for item in trabalho["Detalhes"]:
-                st.session_state.fila_maquinas[maquina_escolhida].append({
+                adicionar_na_fila(maquina_escolhida, {
                     "Proposta": trabalho["Proposta"],
                     "CNC": item["CNC"],
                     "Material": trabalho["Material"],
@@ -53,32 +50,29 @@ for i, maquina in enumerate(MAQUINAS):
     with cols[i % 1]:
         st.markdown(f"## 🔧 {maquina}")
 
-        corte = st.session_state.corte_atual.get(maquina)
-        fila = st.session_state.fila_maquinas.get(maquina, [])
+        corte = obter_corte_atual(maquina)
+        fila = obter_fila(maquina)
 
-        # Mostrar corte atual
         if corte:
             st.markdown(
-                f"**🔹 Corte Atual:** {corte['Proposta']} | CNC {corte['CNC']} | "
-                f"{corte['Material']} | {corte['Espessura']} mm"
+                f"**🔹 Corte Atual:** {corte[1]} | CNC {corte[2]} | {corte[3]} | {corte[4]} mm"
             )
             if st.button("✅ Finalizar Corte Atual", key=f"fim_{maquina}"):
-                st.session_state.corte_atual[maquina] = None
+                finalizar_corte(maquina)
                 st.success("Corte finalizado")
+                st.rerun()
         else:
             st.markdown("_Nenhum corte em andamento_")
 
-        # Mostrar fila
         if fila:
             st.markdown("### 📋 Fila de Espera")
-            df = pd.DataFrame(fila)
-            st.dataframe(df, use_container_width=True, hide_index=True)
+            df = pd.DataFrame(fila, columns=["ID", "Máquina", "Proposta", "CNC", "Material", "Espessura", "Quantidade", "Tempo Total"])
+            st.dataframe(df.drop(columns=["Máquina"]), use_container_width=True, hide_index=True)
 
-            opcoes = [f"{item['Proposta']} | CNC {item['CNC']}" for item in fila]
-            escolha = st.selectbox("Escolha próximo CNC:", opcoes, key=f"escolha_{maquina}")
+            opcoes = {f"{row[2]} | CNC {row[3]}": row[0] for row in fila}
+            escolha = st.selectbox("Escolha próximo CNC:", list(opcoes.keys()), key=f"escolha_{maquina}")
             if st.button("▶️ Iniciar Corte", key=f"iniciar_{maquina}"):
-                index = opcoes.index(escolha)
-                st.session_state.corte_atual[maquina] = fila.pop(index)
+                iniciar_corte(maquina, opcoes[escolha])
                 st.success("Corte iniciado")
                 st.rerun()
         else:
