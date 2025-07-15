@@ -30,11 +30,11 @@ st.title("🛠️ Gestão de Produção")
 # =====================
 # Sidebar - Trabalhos Agrupados
 # =====================
-st.sidebar.title("📋 Trabalhos Agrupados")
+st.sidebar.title("📋 Trabalhos Pendentes")
 trabalhos = carregar_trabalhos(pasta="autorizados")
 
 if not trabalhos:
-    st.info("Nenhum trabalho pendente no momento.")
+    st.sidebar.info("Nenhum trabalho pendente no momento.")
     
 for trabalho in trabalhos:
     with st.sidebar.expander(

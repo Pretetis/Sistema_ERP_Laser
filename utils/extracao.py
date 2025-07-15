@@ -11,14 +11,14 @@ def extrair_dados_por_posicao(caminho_pdf):
     qtd_chapas = 0
 
     for x0, y0, x1, y1, texto, *_ in blocos:
-        if 397 <= x0 <= 448 and 464 <= y0 <= 470:
+        if 397 <= x0 <= 456 and 463 <= y0 <= 470:
             partes = texto.strip().split("-")
             if len(partes) == 3:
                 proposta = partes[0]
                 espessura = int(partes[1]) / 100
                 material = partes[2]
 
-        if 463 <= x0 <= 555 and 464 <= y0 <= 470:
+        if 463 <= x0 <= 555 and 463 <= y0 <= 470:
             linhas = texto.strip().split("\n")
             if len(linhas) == 3:
                 try:

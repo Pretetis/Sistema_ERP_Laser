@@ -1,8 +1,0 @@
-Proposta: M3020
-Espessura (mm): 6.35
-Material: A36
-Programador: Felipe
-Qtd Chapas: 1
-Tempo Total: 00:07:23
-CNC: 1651
-Caminho: C:\fakepath\1651.pdf

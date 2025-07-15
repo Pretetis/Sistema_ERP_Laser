@@ -4,6 +4,10 @@ import sys
 import shutil
 import pandas as pd
 from pathlib import Path
+from streamlit_autorefresh import st_autorefresh
+
+st_autorefresh(interval=7000, key="data_refresh")
+
 
 # Adiciona caminho do projeto para importar corretamente
 sys.path.append(str(Path(__file__).resolve().parent.parent))
@@ -95,14 +99,20 @@ else:
             f"🔹 {trabalho['Proposta']} | {trabalho['Espessura']} mm | {trabalho['Material']} | x {trabalho['Qtd Total']} | ⏱ {trabalho['Tempo Total']}"
         ):
             # 👉 Novo campo de data
-            data_processo = st.date_input("📅 Data prevista do processo", key=f"data_{trabalho['Grupo']}")
+            data_processo = st.date_input("📅 Data prevista do processo", key=f"data_{trabalho['Grupo']}", format="DD/MM/YYYY")
 
-            # 👉 Novo campo de seleção múltipla de processos
-            processos = st.multiselect(
+            # 👉 Campo de seleção múltipla de processos com opção "Somente Corte"
+            processos_selecionados = st.multiselect(
                 "⚙️ Processos envolvidos",
-                options=["Dobra", "Usinagem", "Solda", "Gravação", "Galvanização", "Pintura"],
+                options=["Somente Corte", "Dobra", "Usinagem", "Solda", "Gravação", "Galvanização", "Pintura"],
                 key=f"proc_{trabalho['Grupo']}"
             )
+
+            # Se "Somente Corte" for selecionado, desconsidera os outros
+            if "Somente Corte" in processos_selecionados:
+                processos_final = []
+            else:
+                processos_final = processos_selecionados
             for item in trabalho["Detalhes"]:
                 with st.container(border=True):
                     col1, col2 = st.columns([2, 2])
@@ -130,7 +140,7 @@ else:
                 if st.button("✅ Autorizar", key=f"auth_{trabalho['Grupo']}"):
                     # Captura as escolhas do usuário
                     data_str = str(data_processo)
-                    processos_str = ", ".join(processos)
+                    processos_str = ", ".join(processos_final) if processos_final else "Somente Corte"
 
                     origem = f"{trabalho['Grupo']}.txt"
                     origem_path = PASTA_TXT_PRONTOS / origem
