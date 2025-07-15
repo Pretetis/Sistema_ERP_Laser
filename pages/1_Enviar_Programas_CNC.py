@@ -94,6 +94,15 @@ else:
         with st.expander(
             f"🔹 {trabalho['Proposta']} | {trabalho['Espessura']} mm | {trabalho['Material']} | x {trabalho['Qtd Total']} | ⏱ {trabalho['Tempo Total']}"
         ):
+            # 👉 Novo campo de data
+            data_processo = st.date_input("📅 Data prevista do processo", key=f"data_{trabalho['Grupo']}")
+
+            # 👉 Novo campo de seleção múltipla de processos
+            processos = st.multiselect(
+                "⚙️ Processos envolvidos",
+                options=["Dobra", "Usinagem", "Solda", "Gravação", "Galvanização", "Pintura"],
+                key=f"proc_{trabalho['Grupo']}"
+            )
             for item in trabalho["Detalhes"]:
                 with st.container(border=True):
                     col1, col2 = st.columns([2, 2])
@@ -119,14 +128,36 @@ else:
             col1, col2 = st.columns(2)
             with col1:
                 if st.button("✅ Autorizar", key=f"auth_{trabalho['Grupo']}"):
-                    for item in trabalho["Detalhes"]:
-                        origem = f"{trabalho['Grupo']}.txt"
-                        origem_path = PASTA_TXT_PRONTOS / origem
-                        destino_path = PASTA_AUTORIZADOS / origem
-                        if origem_path.exists():
-                            shutil.move(str(origem_path), str(destino_path))
-                    st.success(f"Trabalho do grupo {trabalho['Grupo']} autorizado.")
-                    st.rerun()
+                    # Captura as escolhas do usuário
+                    data_str = str(data_processo)
+                    processos_str = ", ".join(processos)
+
+                    origem = f"{trabalho['Grupo']}.txt"
+                    origem_path = PASTA_TXT_PRONTOS / origem
+                    destino_path = PASTA_AUTORIZADOS / origem
+
+                    if origem_path.exists():
+                        # Lê o conteúdo original
+                        with open(origem_path, "r", encoding="utf-8") as f:
+                            conteudo_original = f.read()
+
+                        # Adiciona os dados extras ao final
+                        conteudo_complementado = (
+                            conteudo_original.strip()
+                            + "\n\n"
+                            + "===== INFORMAÇÕES ADICIONAIS =====\n"
+                            + f"Data prevista: {data_str}\n"
+                            + f"Processos: {processos_str}\n"
+                        )
+
+                        # Salva no destino com o conteúdo completo
+                        with open(destino_path, "w", encoding="utf-8") as f:
+                            f.write(conteudo_complementado)
+
+                        origem_path.unlink()  # Remove o original da pasta de pendentes
+
+                        st.success(f"Trabalho do grupo {trabalho['Grupo']} autorizado.")
+                        st.rerun()
             with col2:
                 if st.button("❌ Rejeitar", key=f"rej_{trabalho['Grupo']}"):
                     for item in trabalho["Detalhes"]:
