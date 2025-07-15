@@ -15,3 +15,7 @@ CNC: 1633
 Qtd Chapas: 1
 Tempo Total: 00:00:03.03
 Caminho: C:\Users\Microns\Desktop\Sistema_ERP_Laser\CNC\1633.pdf
+
+===== INFORMAÇÕES ADICIONAIS =====
+Data prevista: 2025-10-20
+Processos: Dobra, Usinagem, Solda

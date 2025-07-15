@@ -1,0 +1,8 @@
+Proposta: M0002
+Espessura (mm): 1.25
+Material: GALV
+Programador: Felipe
+Qtd Chapas: 1
+Tempo Total: 00:00:26.78
+CNC: 1799
+Caminho: C:\Users\Microns\Desktop\Sistema_ERP_Laser\CNC\1799.pdf

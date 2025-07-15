@@ -1,0 +1,15 @@
+Programador: Felipe
+CNC: 1795
+Qtd Chapas: 1
+Tempo Total: 00:00:08.25
+Caminho: C:\Users\Microns\Desktop\Sistema_ERP_Laser\CNC\1795.pdf
+
+Programador: Felipe
+CNC: 1796
+Qtd Chapas: 1
+Tempo Total: 00:00:16.22
+Caminho: C:\Users\Microns\Desktop\Sistema_ERP_Laser\CNC\1796.pdf
+
+===== INFORMAÇÕES ADICIONAIS =====
+Data prevista: 2025-07-15
+Processos: Somente Corte

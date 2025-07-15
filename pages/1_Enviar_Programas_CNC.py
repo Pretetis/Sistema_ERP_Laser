@@ -19,6 +19,17 @@ from utils.visualizacao import gerar_preview_pdf
 
 st.set_page_config(page_title="Minha Página", layout="wide")
 
+st.markdown(
+        """
+        <style>
+        .stExpander p {
+            font-size: 20px;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
 barra_navegacao()  # Exibe a barra no topo
 
 
@@ -95,24 +106,29 @@ if not trabalhos:
     st.info("Nenhum trabalho pendente no momento.")
 else:
     for trabalho in trabalhos:
-        with st.expander(
-            f"🔹 {trabalho['Proposta']} | {trabalho['Espessura']} mm | {trabalho['Material']} | x {trabalho['Qtd Total']} | ⏱ {trabalho['Tempo Total']}"
-        ):
+        with st.expander(f"🔹 {trabalho['Proposta']} | {trabalho['Espessura']} mm | {trabalho['Material']} | x {trabalho['Qtd Total']} | ⏱ {trabalho['Tempo Total']}"):
             # 👉 Novo campo de data
-            data_processo = st.date_input("📅 Data prevista do processo", key=f"data_{trabalho['Grupo']}", format="DD/MM/YYYY")
+            data_processo = st.date_input("Data", key=f"data_{trabalho['Grupo']}", format="DD/MM/YYYY")
 
             # 👉 Campo de seleção múltipla de processos com opção "Somente Corte"
-            processos_selecionados = st.multiselect(
-                "⚙️ Processos envolvidos",
-                options=["Somente Corte", "Dobra", "Usinagem", "Solda", "Gravação", "Galvanização", "Pintura"],
-                key=f"proc_{trabalho['Grupo']}"
-            )
+            processos_possiveis = ["Dobra", "Usinagem", "Solda", "Gravação", "Galvanização", "Pintura"]
 
-            # Se "Somente Corte" for selecionado, desconsidera os outros
-            if "Somente Corte" in processos_selecionados:
+            # Criar checkboxes na mesma linha
+            col_processos = st.columns(len(processos_possiveis))
+
+            # Guardar os processos marcados
+            processos_selecionados = []
+
+            for i, processo in enumerate(processos_possiveis):
+                if col_processos[i].checkbox(processo, key=f"proc_{trabalho['Grupo']}_{processo}"):
+                    processos_selecionados.append(processo)
+
+            # Se nenhum foi selecionado, considerar "Somente Corte"
+            if not processos_selecionados:
                 processos_final = []
             else:
                 processos_final = processos_selecionados
+
             for item in trabalho["Detalhes"]:
                 with st.container(border=True):
                     col1, col2 = st.columns([2, 2])

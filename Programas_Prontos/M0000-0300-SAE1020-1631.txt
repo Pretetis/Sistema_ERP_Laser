@@ -1,0 +1,8 @@
+Proposta: M0000
+Espessura (mm): 3.0
+Material: SAE1020
+Programador: Felipe
+Qtd Chapas: 1
+Tempo Total: 00:00:01.57
+CNC: 1631
+Caminho: C:\Users\Microns\Desktop\Sistema_ERP_Laser\CNC\1631.pdf

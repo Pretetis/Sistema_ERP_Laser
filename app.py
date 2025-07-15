@@ -33,14 +33,23 @@ st.title("🛠️ Gestão de Produção")
 st.sidebar.title("📋 Trabalhos Pendentes")
 trabalhos = carregar_trabalhos(pasta="autorizados")
 
-if not trabalhos:
-    st.sidebar.info("Nenhum trabalho pendente no momento.")
-    
 for trabalho in trabalhos:
-    with st.sidebar.expander(
-        f"🔹 {trabalho['Proposta']} | {trabalho['Espessura']} mm | {trabalho['Material']} | x {trabalho['Qtd Total']} | ⏱ {trabalho['Tempo Total']}"
-    ):
+    titulo = (
+        f"🔹 {trabalho['Proposta']} | {trabalho['Espessura']} mm | {trabalho['Material']} "
+        f"| x {trabalho['Qtd Total']} | ⏱ {trabalho['Tempo Total']}"
+    )
 
+    if trabalho.get("Data Prevista"):
+        try:
+            data_fmt = "/".join(reversed(trabalho["Data Prevista"].split("-")))
+            titulo += f" | 📅 {data_fmt}"
+        except:
+            pass  # Em caso de formato inválido
+
+    if trabalho.get("Processos"):
+        titulo += f" | ⚙️ {trabalho['Processos']}"
+
+    with st.sidebar.expander(titulo):
         for item in trabalho["Detalhes"]:
             with st.container(border=True):
                 col1, col2 = st.columns([2, 2])

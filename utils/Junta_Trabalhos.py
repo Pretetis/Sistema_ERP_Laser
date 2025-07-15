@@ -3,6 +3,7 @@ def carregar_trabalhos(pasta="autorizados"):
     import pandas as pd
 
     registros = []
+    infos_adicionais = {}
 
     pasta_path = Path(pasta)
     if not pasta_path.exists():
@@ -12,37 +13,55 @@ def carregar_trabalhos(pasta="autorizados"):
     if not arquivos_txt:
         return []
 
-    for txt in Path(pasta).glob("*.txt"):
+    for txt in arquivos_txt:
         partes = txt.stem.split("-")
-        if len(partes) == 3:
-            chave_grupo = "-".join(partes)
-            with open(txt, "r", encoding="utf-8") as f:
-                blocos = f.read().strip().split("\n\n")  # divide por blocos de CNC
+        if len(partes) != 3:
+            continue
 
-            for bloco in blocos:
-                dados = {}
-                for linha in bloco.strip().splitlines():
-                    if ":" in linha:
-                        k, v = linha.split(":", 1)
-                        dados[k.strip()] = v.strip()
+        chave_grupo = "-".join(partes)
+        with open(txt, "r", encoding="utf-8") as f:
+            conteudo = f.read().strip()
 
-                if dados:
-                    registros.append({
-                        "Grupo": chave_grupo,
-                        "Proposta": partes[0],
-                        "Espessura": float(partes[1]) / 100,
-                        "Material": partes[2],
-                        "CNC": dados.get("CNC", ""),
-                        "Programador": dados.get("Programador", ""),
-                        "Qtd Chapas": dados.get("Qtd Chapas", "1"),
-                        "Tempo Total": dados.get("Tempo Total", ""),
-                        "Caminho PDF": dados.get("Caminho", "")
-                    })
+        # Separa blocos
+        blocos = conteudo.split("\n\n")
 
-    df = pd.DataFrame(registros)   
+        for bloco in blocos:
+            if "===== INFORMAÇÕES ADICIONAIS =====" in bloco:
+                for linha in bloco.splitlines():
+                    if linha.startswith("Data prevista:"):
+                        infos_adicionais.setdefault(chave_grupo, {})["Data Prevista"] = linha.split(":", 1)[1].strip()
+                    elif linha.startswith("Processos:"):
+                        infos_adicionais.setdefault(chave_grupo, {})["Processos"] = linha.split(":", 1)[1].strip()
+                # ⚠️ pula esse bloco para não processar como CNC
+                continue
+
+            # IGNORA blocos que não contêm CNC
+            if not bloco.strip().startswith("Programador:"):
+                continue
+
+            dados = {}
+            for linha in bloco.strip().splitlines():
+                if ":" in linha:
+                    k, v = linha.split(":", 1)
+                    dados[k.strip()] = v.strip()
+
+            if dados.get("CNC"):  # só adiciona se tiver CNC válido
+                registros.append({
+                    "Grupo": chave_grupo,
+                    "Proposta": partes[0],
+                    "Espessura": float(partes[1]) / 100,
+                    "Material": partes[2],
+                    "CNC": dados.get("CNC", ""),
+                    "Programador": dados.get("Programador", ""),
+                    "Qtd Chapas": dados.get("Qtd Chapas", "1"),
+                    "Tempo Total": dados.get("Tempo Total", ""),
+                    "Caminho PDF": dados.get("Caminho", "")
+                })
+
+    df = pd.DataFrame(registros)
     if df.empty:
         return []
-    
+
     trabalhos = []
 
     for grupo_nome, subdf in df.groupby("Grupo"):
@@ -52,7 +71,7 @@ def carregar_trabalhos(pasta="autorizados"):
         segundos = int(tempo_total.total_seconds())
         tempo_formatado = f"{segundos // 3600:02} H:{(segundos % 3600) // 60:02} M:{segundos % 60:02} S"
 
-        trabalhos.append({
+        trabalho = {
             "Grupo": grupo_nome,
             "Proposta": subdf.iloc[0]["Proposta"],
             "Espessura": subdf.iloc[0]["Espessura"],
@@ -60,6 +79,15 @@ def carregar_trabalhos(pasta="autorizados"):
             "Qtd Total": subdf["Qtd Chapas"].astype(int).sum(),
             "Tempo Total": tempo_formatado,
             "Detalhes": subdf.to_dict(orient="records")
-        })
+        }
+
+        # Adiciona as informações extras, se existirem
+        extras = infos_adicionais.get(grupo_nome, {})
+        if extras.get("Data Prevista"):
+            trabalho["Data Prevista"] = extras["Data Prevista"]
+        if extras.get("Processos"):
+            trabalho["Processos"] = extras["Processos"]
+
+        trabalhos.append(trabalho)
 
     return trabalhos

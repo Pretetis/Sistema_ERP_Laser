@@ -1,0 +1,8 @@
+Proposta: M3353
+Espessura (mm): 10.0
+Material: HARDOX500
+Programador: Felipe
+Qtd Chapas: 1
+Tempo Total: 00:56:07.77
+CNC: 1751
+Caminho: C:\Users\Microns\Desktop\Sistema_ERP_Laser\CNC\1751.pdf

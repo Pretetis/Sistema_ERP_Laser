@@ -1,0 +1,8 @@
+Proposta: M0001
+Espessura (mm): 1.0
+Material: ALUMINIO
+Programador: Felipe
+Qtd Chapas: 1
+Tempo Total: 00:00:16.22
+CNC: 1796
+Caminho: C:\Users\Microns\Desktop\Sistema_ERP_Laser\CNC\1796.pdf
