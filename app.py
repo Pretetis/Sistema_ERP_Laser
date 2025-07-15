@@ -56,7 +56,7 @@ for trabalho in trabalhos:
                     if caminho_pdf and Path(caminho_pdf).exists():
                         preview_path = gerar_preview_pdf(caminho_pdf)
                         if preview_path:
-                            st.image(preview_path, caption=f"CNC {item['CNC']}", use_column_width="auto")
+                            st.image(preview_path, caption=f"CNC {item['CNC']}", use_container_width="auto")
                         else:
                             st.warning("Erro ao gerar preview.")
                     else:
