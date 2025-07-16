@@ -1,4 +1,10 @@
 Programador: Felipe
+CNC: 1633
+Qtd Chapas: 1
+Tempo Total: 00:00:03.03
+Caminho: C:\Users\Microns\Desktop\Sistema_ERP_Laser\CNC\1633.pdf
+
+Programador: Felipe
 CNC: 1631
 Qtd Chapas: 1
 Tempo Total: 00:00:01.57
@@ -9,12 +15,6 @@ CNC: 1632
 Qtd Chapas: 1
 Tempo Total: 00:00:04.49
 Caminho: C:\Users\Microns\Desktop\Sistema_ERP_Laser\CNC\1632.pdf
-
-Programador: Felipe
-CNC: 1633
-Qtd Chapas: 1
-Tempo Total: 00:00:03.03
-Caminho: C:\Users\Microns\Desktop\Sistema_ERP_Laser\CNC\1633.pdf
 
 ===== INFORMAÇÕES ADICIONAIS =====
 Data prevista: 2025-07-16

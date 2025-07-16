@@ -154,10 +154,60 @@ for i, maquina in enumerate(MAQUINAS):
 
         if fila:
             st.markdown("### 📋 Fila de Espera")
-            df = pd.DataFrame(fila, columns=["ID", "Máquina", "Proposta", "CNC", "Material", "Espessura", "Quantidade", "Tempo Total"])
-            st.dataframe(df.drop(columns=["Máquina"]), use_container_width=True, hide_index=True)
 
-            opcoes = {f"{row[2]} | CNC {row[3]}": row[0] for row in fila}
+            dados_fila = []
+            opcoes = {}
+
+            for item in fila:
+                item_dict = {
+                    "ID": item[0],
+                    "Máquina": item[1],
+                    "Proposta": item[2],
+                    "CNC": item[3],
+                    "Material": item[4],
+                    "Espessura": item[5],
+                    "Quantidade": item[6],
+                    "Tempo Total": item[7],
+                }
+
+                # Geração do caminho do PDF com base no nome da proposta + CNC
+                nome_pdf = f"{item_dict['Proposta']}_{item_dict['CNC']}.pdf"
+                caminho_pdf = Path("autorizados") / nome_pdf
+
+                if caminho_pdf.exists():
+                    preview_path = gerar_preview_pdf(caminho_pdf)
+                    if preview_path:
+                        item_dict["Imagem"] = f"[Ver Imagem]({preview_path.as_posix()})"
+                    else:
+                        item_dict["Imagem"] = "Erro preview"
+                else:
+                    item_dict["Imagem"] = "PDF não encontrado"
+
+                item_dict["Separado"] = ""  # Campo manual, editável
+                dados_fila.append(item_dict)
+
+                # Para dropdown de seleção do CNC
+                chave_opcao = f"{item_dict['Proposta']} | CNC {item_dict['CNC']}"
+                opcoes[chave_opcao] = item_dict["ID"]
+
+            # Criar DataFrame
+            df = pd.DataFrame(dados_fila)
+
+            # Editor do campo "Separado"
+            edited_df = st.data_editor(
+                df.drop(columns=["Imagem", "ID", "Máquina"]),
+                column_config={
+                    "Separado": st.column_config.TextColumn("Separado (Local)", required=False),
+                },
+                use_container_width=True,
+                hide_index=True
+            )
+
+            # Mostrar links de imagem em formato markdown
+            st.markdown("### 🔗 Links para Visualizar Imagem")
+            st.markdown(df[["Proposta", "CNC", "Imagem"]].to_markdown(index=False), unsafe_allow_html=True)
+
+            # Dropdown para iniciar corte
             escolha = st.selectbox("Escolha próximo CNC:", list(opcoes.keys()), key=f"escolha_{maquina}")
 
             col_iniciar, col_ret, col_excluir_fila = st.columns(3)

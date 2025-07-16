@@ -92,7 +92,7 @@ if st.button("📥 Processar PDFs"):
         with open(caminho_txt, "w", encoding="utf-8") as f:
             f.write(conteudo)
 
-    st.success("Arquivos agrupados salvos em 'Programas_Prontos/'")
+    st.success("Arquivos agrupados salvos em 'Programas_Prontos'")
 
 # =====================
 # 2. Trabalhos pendentes agrupados
@@ -137,7 +137,48 @@ else:
                         st.markdown(f"**Programador:** {item['Programador']}")
                         st.markdown(f"**CNC:** {item['CNC']}")
                         st.markdown(f"**Qtd Chapas:** {item['Qtd Chapas']}")
+
+                        # Aqui começa o código para editar o tempo
+                        tempo_key = f"tempo_edit_{item['CNC']}"  # chave única
+                        editar_key = f"editar_tempo_{item['CNC']}"
+
                         st.markdown(f"**Tempo Total:** {item['Tempo Total']}")
+
+                        if st.button("Editar Tempo", key=editar_key):
+                            st.session_state[tempo_key] = True
+
+                        if st.session_state.get(tempo_key, False):
+                            col_h, col_m, col_s = st.columns(3)
+
+                            horas = col_h.number_input("Horas", min_value=0, value=0, key=f"h_{item['CNC']}")
+                            minutos = col_m.number_input("Min", min_value=0, max_value=59, value=0, key=f"m_{item['CNC']}")
+                            segundos = col_s.number_input("Seg", min_value=0, max_value=59, value=0, key=f"s_{item['CNC']}")
+                            tempo_editado = f"{int(horas):02d}:{int(minutos):02d}:{int(segundos):02d}"
+
+                            if st.button("Salvar", key=f"salvar_{item['CNC']}"):
+                                item['Tempo Total'] = tempo_editado
+                                st.session_state[tempo_key] = False
+
+                                linhas = []
+                                for detalhe in trabalho["Detalhes"]:
+                                    # Garantir que "Caminho" não esteja vazio
+                                    caminho = detalhe.get('Caminho')
+                                    if not caminho and 'CNC' in detalhe:
+                                        possivel = PASTA_PDF / f"{detalhe['CNC']}.pdf"
+                                        caminho = str(possivel.resolve()) if possivel.exists() else ""
+
+                                    detalhe['Caminho'] = caminho or "Caminho desconhecido"
+
+                                    linhas.append(f"Programador: {detalhe['Programador']}")
+                                    linhas.append(f"CNC: {detalhe['CNC']}")
+                                    linhas.append(f"Qtd Chapas: {detalhe['Qtd Chapas']}")
+                                    linhas.append(f"Tempo Total: {detalhe['Tempo Total']}")
+                                    linhas.append(f"Caminho: {detalhe['Caminho']}")
+                                    linhas.append("")
+
+                                caminho_txt = PASTA_TXT_PRONTOS / f"{trabalho['Grupo']}.txt"
+                                with open(caminho_txt, "w", encoding="utf-8") as f:
+                                    f.write("\n".join(linhas))
 
                     with col2:
                         caminho_pdf = item.get("Caminho PDF") or item.get("Caminho")
