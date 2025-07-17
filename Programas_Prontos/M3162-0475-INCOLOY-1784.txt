@@ -1,0 +1,8 @@
+Proposta: M3162
+Espessura (mm): 4.75
+Material: INCOLOY
+Programador: Lucas
+Qtd Chapas: 1
+Tempo Total: 00:02:36.36
+Caminho: https://res.cloudinary.com/dm6vke2eo/image/upload/v1752773578/previews_pdf/1784.png
+CNC: 1784

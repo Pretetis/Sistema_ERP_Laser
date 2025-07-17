@@ -1,0 +1,17 @@
+Programador: Felipe
+CNC: 1633
+Qtd Chapas: 1
+Tempo Total: 00:00:03.03
+Caminho: https://res.cloudinary.com/dm6vke2eo/image/upload/v1752771678/previews_pdf/1633.png
+
+Programador: Felipe
+CNC: 1631
+Qtd Chapas: 1
+Tempo Total: 00:00:01.57
+Caminho: https://res.cloudinary.com/dm6vke2eo/image/upload/v1752771675/previews_pdf/1631.png
+
+Programador: Felipe
+CNC: 1632
+Qtd Chapas: 1
+Tempo Total: 00:00:04.49
+Caminho: https://res.cloudinary.com/dm6vke2eo/image/upload/v1752771676/previews_pdf/1632.png

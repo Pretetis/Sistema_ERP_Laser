@@ -2,6 +2,7 @@ import streamlit as st
 from pathlib import Path
 import pandas as pd
 from utils.Junta_Trabalhos import carregar_trabalhos
+from utils.cloudinary_txt import enviar_txt_cloudinary
 from utils.db import (
     criar_banco, adicionar_na_fila, obter_fila,
     obter_corte_atual, iniciar_corte, finalizar_corte,
@@ -31,7 +32,7 @@ st.title("🛠️ Gestão de Produção")
 # Sidebar - Trabalhos Agrupados
 # =====================
 st.sidebar.title("📋 Trabalhos Pendentes")
-trabalhos = carregar_trabalhos(pasta="autorizados")
+trabalhos = carregar_trabalhos()
 
 for trabalho in trabalhos:
     titulo = (

@@ -3,6 +3,9 @@ from pathlib import Path
 import sys
 from pathlib import Path
 from streamlit_autorefresh import st_autorefresh
+from io import BytesIO
+
+from utils.cloudinary_txt import enviar_txt_cloudinary
 from utils.extracao import extrair_dados_por_posicao
 from utils.Junta_Trabalhos import carregar_trabalhos
 from utils.navegacao import barra_navegacao
@@ -77,9 +80,11 @@ if st.button("📥 Processar PDFs"):
             linhas.append("")
 
         conteudo = "\n".join(linhas)
-        caminho_txt = PASTA_TXT_PRONTOS / f"{chave}.txt"  # ✅ sem CNC no nome
-        with open(caminho_txt, "w", encoding="utf-8") as f:
-            f.write(conteudo)
+        arquivo_temp = Path(f"{chave}.txt")
+        arquivo_temp.write_text(conteudo, encoding="utf-8")
+        enviar_txt_cloudinary(arquivo_temp)
+        arquivo_temp.unlink()
+
 
     st.success("Arquivos agrupados salvos em 'Programas_Prontos'")
 
@@ -89,23 +94,17 @@ if st.button("📥 Processar PDFs"):
 st.markdown("---")
 st.subheader("🕓 Trabalhos aguardando autorização")
 
-trabalhos = carregar_trabalhos(pasta="Programas_Prontos")
+trabalhos = carregar_trabalhos()
 
 if not trabalhos:
     st.info("Nenhum trabalho pendente no momento.")
 else:
     for trabalho in trabalhos:
         with st.expander(f"🔹 {trabalho['Proposta']} | {trabalho['Espessura']} mm | {trabalho['Material']} | x {trabalho['Qtd Total']} | ⏱ {trabalho['Tempo Total']}"):
-            # 👉 Novo campo de data
+
             data_processo = st.date_input("Data", key=f"data_{trabalho['Grupo']}", format="DD/MM/YYYY")
-
-            # 👉 Campo de seleção múltipla de processos com opção "Somente Corte"
             processos_possiveis = ["Dobra", "Usinagem", "Solda", "Gravação", "Galvanização", "Pintura"]
-
-            # Criar checkboxes na mesma linha
             col_processos = st.columns(len(processos_possiveis))
-
-            # Guardar os processos marcados
             processos_selecionados = []
 
             for i, processo in enumerate(processos_possiveis):
@@ -126,7 +125,7 @@ else:
                         st.markdown(f"**Programador:** {item['Programador']}")
                         st.markdown(f"**CNC:** {item['CNC']}")
                         st.markdown(f"**Qtd Chapas:** {item['Qtd Chapas']}")
-                        
+
                         # Aqui começa o código para editar o tempo
                         tempo_key = f"tempo_edit_{item['CNC']}"  # chave única
                         editar_key = f"editar_tempo_{item['CNC']}"

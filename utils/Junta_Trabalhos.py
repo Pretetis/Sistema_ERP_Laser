@@ -1,15 +1,24 @@
-def carregar_trabalhos(pasta="autorizados"):
-    from pathlib import Path
-    import pandas as pd
+from pathlib import Path
+import pandas as pd
+import tempfile
 
+from utils.cloudinary_txt import listar_txts_cloudinary
+from utils.cloudinary_txt import baixar_txt_cloudinary
+
+def carregar_trabalhos():
     registros = []
     infos_adicionais = {}
+    
+    grupos = listar_txts_cloudinary()
 
-    pasta_path = Path(pasta)
-    if not pasta_path.exists():
-        return []
+    arquivos_txt = []
+    for grupo in grupos:
+        nome_arquivo = f"{grupo}.txt"
+        destino = Path(tempfile.gettempdir()) / nome_arquivo
+        sucesso = baixar_txt_cloudinary(nome_arquivo, destino)
+        if sucesso:
+            arquivos_txt.append(destino)
 
-    arquivos_txt = list(pasta_path.glob("*.txt"))
     if not arquivos_txt:
         return []
 
