@@ -3,3 +3,4 @@ pandas
 streamlit-autorefresh
 pymupdf
 pdf2image
+cloudinary
