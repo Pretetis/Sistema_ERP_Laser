@@ -1,8 +1,0 @@
-Proposta: M3062
-Espessura (mm): 9.53
-Material: A36
-Programador: Felipe
-Qtd Chapas: 1
-Tempo Total: 00:12:53.87
-Caminho: https://res.cloudinary.com/dm6vke2eo/image/upload/v1752760154/previews_pdf/1490.png
-CNC: 1490

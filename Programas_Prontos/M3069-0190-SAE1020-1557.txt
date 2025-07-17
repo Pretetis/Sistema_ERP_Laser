@@ -1,8 +1,0 @@
-Proposta: M3069
-Espessura (mm): 1.9
-Material: SAE1020
-Programador: Felipe
-Qtd Chapas: 50
-Tempo Total: 37:38:38.10
-Caminho: https://res.cloudinary.com/dm6vke2eo/image/upload/v1752760154/previews_pdf/1557.png
-CNC: 1557

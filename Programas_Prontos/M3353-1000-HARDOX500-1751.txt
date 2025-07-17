@@ -1,8 +1,0 @@
-Proposta: M3353
-Espessura (mm): 10.0
-Material: HARDOX500
-Programador: Felipe
-Qtd Chapas: 1
-Tempo Total: 00:56:07.77
-Caminho: https://res.cloudinary.com/dm6vke2eo/image/upload/v1752760160/previews_pdf/1751.png
-CNC: 1751

@@ -1,8 +1,0 @@
-Proposta: M3011
-Espessura (mm): 3.0
-Material: AISI304
-Programador: Felipe
-Qtd Chapas: 2
-Tempo Total: 00:40:19.17
-Caminho: https://res.cloudinary.com/dm6vke2eo/image/upload/v1752760156/previews_pdf/1617.png
-CNC: 1617

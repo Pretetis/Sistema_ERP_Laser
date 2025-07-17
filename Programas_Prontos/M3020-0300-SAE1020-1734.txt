@@ -1,8 +1,0 @@
-Proposta: M3020
-Espessura (mm): 3.0
-Material: SAE1020
-Programador: Felipe
-Qtd Chapas: 1
-Tempo Total: 00:01:04.19
-Caminho: https://res.cloudinary.com/dm6vke2eo/image/upload/v1752760159/previews_pdf/1734.png
-CNC: 1734
