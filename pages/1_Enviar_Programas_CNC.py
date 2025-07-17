@@ -1,23 +1,19 @@
 import streamlit as st
 from pathlib import Path
 import sys
-import shutil
-import pandas as pd
 from pathlib import Path
 from streamlit_autorefresh import st_autorefresh
-
-st_autorefresh(interval=7000, key="data_refresh")
-
-
-# Adiciona caminho do projeto para importar corretamente
-sys.path.append(str(Path(__file__).resolve().parent.parent))
-
 from utils.extracao import extrair_dados_por_posicao
 from utils.Junta_Trabalhos import carregar_trabalhos
 from utils.navegacao import barra_navegacao
-from utils.visualizacao import gerar_preview_pdf
 
-st.set_page_config(page_title="Minha Página", layout="wide")
+st_autorefresh(interval=7000, key="data_refresh")
+
+# Adiciona caminho do projeto para importar corretamente
+sys.path.append(str(Path(__file__).resolve().parent.parent))
+st.set_page_config(page_title="Enviar Programas CNC", layout="wide")
+st.title("📤 Enviar Programas CNC")
+barra_navegacao()  # Exibe a barra no topo
 
 st.markdown(
         """
@@ -30,9 +26,6 @@ st.markdown(
         unsafe_allow_html=True,
     )
 
-barra_navegacao()  # Exibe a barra no topo
-
-
 # Caminhos das pastas
 RAIZ = Path(__file__).resolve().parent.parent
 PASTA_PDF = RAIZ / "CNC"
@@ -43,9 +36,6 @@ PASTA_AUTORIZADOS = RAIZ / "autorizados"
 PASTA_PDF.mkdir(exist_ok=True)
 PASTA_TXT_PRONTOS.mkdir(exist_ok=True)
 PASTA_AUTORIZADOS.mkdir(exist_ok=True)
-
-st.set_page_config(page_title="Enviar Programas CNC", layout="wide")
-st.title("📤 Enviar Programas CNC")
 
 # =====================
 # 1. Upload dos PDFs
@@ -65,7 +55,6 @@ if st.button("📥 Processar PDFs"):
 
         if info:
             info["CNC"] = caminho_pdf.stem
-            info["Caminho"] = str(caminho_pdf.resolve())
             registros.append(info)
 
     # Agrupamento por chave: Proposta-Espessura-Material
@@ -137,7 +126,7 @@ else:
                         st.markdown(f"**Programador:** {item['Programador']}")
                         st.markdown(f"**CNC:** {item['CNC']}")
                         st.markdown(f"**Qtd Chapas:** {item['Qtd Chapas']}")
-
+                        
                         # Aqui começa o código para editar o tempo
                         tempo_key = f"tempo_edit_{item['CNC']}"  # chave única
                         editar_key = f"editar_tempo_{item['CNC']}"
@@ -181,16 +170,8 @@ else:
                                     f.write("\n".join(linhas))
 
                     with col2:
-                        caminho_pdf = item.get("Caminho PDF") or item.get("Caminho")
-                        if caminho_pdf and Path(caminho_pdf).exists():
-                            preview_path = gerar_preview_pdf(caminho_pdf)
-                            if preview_path:
-                                st.image(preview_path, caption=f"CNC {item['CNC']}", use_container_width="auto")
-                            else:
-                                st.warning("Erro ao gerar preview.")
-                        else:
-                            st.warning("Arquivo PDF não encontrado.")
-
+                        caminho_pdf = item.get("Caminho")
+                        st.image(str(caminho_pdf), caption=f"CNC {item['CNC']}", use_container_width="auto")
 
             col1, col2 = st.columns(2)
             with col1:

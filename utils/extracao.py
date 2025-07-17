@@ -1,11 +1,13 @@
 import fitz  # PyMuPDF
-import pandas as pd
 from pathlib import Path
+from utils.visualizacao2 import gerar_preview_pdf
 
 def extrair_dados_por_posicao(caminho_pdf):
     doc = fitz.open(caminho_pdf)
     pagina = doc[0]
     blocos = pagina.get_text("blocks")
+
+    link_cloudinary = gerar_preview_pdf(caminho_pdf)
 
     proposta = espessura = material = programador = tempo_total = None
     qtd_chapas = 0
@@ -35,7 +37,8 @@ def extrair_dados_por_posicao(caminho_pdf):
             "Material": material,
             "Programador": programador,
             "Qtd Chapas": qtd_chapas,
-            "Tempo Total": tempo_total
+            "Tempo Total": tempo_total,
+            "Caminho": link_cloudinary
         }
     else:
         return None
@@ -52,7 +55,6 @@ for arquivo in arquivos_pdf:
     info = extrair_dados_por_posicao(arquivo)
     if info:
         info["CNC"] = arquivo.stem
-        info["Caminho"] = str(arquivo.resolve())
 
         # Cria nome do arquivo com base nas colunas
         espessura_raw = info["Espessura (mm)"]

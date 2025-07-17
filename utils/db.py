@@ -18,7 +18,8 @@ def criar_banco():
             material TEXT,
             espessura REAL,
             quantidade INTEGER,
-            tempo_total TEXT
+            tempo_total TEXT,
+            caminho TEXT
         )
     """)
     
@@ -42,10 +43,10 @@ def adicionar_na_fila(maquina, trabalho):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("""
-        INSERT INTO fila_maquinas (maquina, proposta, cnc, material, espessura, quantidade, tempo_total)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO fila_maquinas (maquina, proposta, cnc, material, espessura, quantidade, tempo_total, caminho)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     """, (maquina, trabalho["Proposta"], trabalho["CNC"], trabalho["Material"],
-          trabalho["Espessura"], trabalho["Quantidade"], trabalho["Tempo Total"]))
+          trabalho["Espessura"], trabalho["Quantidade"], trabalho["Tempo Total"], trabalho["Caminho"]))
     conn.commit()
     conn.close()
 

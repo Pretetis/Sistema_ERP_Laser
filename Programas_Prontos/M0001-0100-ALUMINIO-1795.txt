@@ -4,5 +4,5 @@ Material: ALUMINIO
 Programador: Felipe
 Qtd Chapas: 1
 Tempo Total: 00:00:08.25
+Caminho: https://res.cloudinary.com/dm6vke2eo/image/upload/v1752753632/previews_pdf/1795.png
 CNC: 1795
-Caminho: C:\Users\Microns\Desktop\Sistema_ERP_Laser\CNC\1795.pdf

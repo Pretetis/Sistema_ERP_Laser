@@ -4,5 +4,5 @@ Material: SAE1020
 Programador: Felipe
 Qtd Chapas: 50
 Tempo Total: 37:38:38.10
+Caminho: https://res.cloudinary.com/dm6vke2eo/image/upload/v1752760154/previews_pdf/1557.png
 CNC: 1557
-Caminho: C:\Users\Microns\Desktop\Sistema_ERP_Laser\CNC\1557.pdf

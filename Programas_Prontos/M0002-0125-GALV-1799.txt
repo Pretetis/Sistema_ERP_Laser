@@ -4,5 +4,5 @@ Material: GALV
 Programador: Felipe
 Qtd Chapas: 1
 Tempo Total: 00:00:26.78
+Caminho: https://res.cloudinary.com/dm6vke2eo/image/upload/v1752753635/previews_pdf/1799.png
 CNC: 1799
-Caminho: C:\Users\Microns\Desktop\Sistema_ERP_Laser\CNC\1799.pdf

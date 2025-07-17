@@ -10,8 +10,6 @@ from utils.db import (
     registrar_trabalho_enviado, retornar_item_da_fila_para_pendentes
 )
 
-from utils.visualizacao import gerar_preview_pdf
-
 MAQUINAS = ["LASER 1", "LASER 2", "LASER 3", "LASER 4", "LASER 5", "LASER 6"]
 
 from streamlit_autorefresh import st_autorefresh
@@ -21,7 +19,7 @@ st_autorefresh(interval=7000, key="data_refresh")
 
 from utils.navegacao import barra_navegacao
 
-st.set_page_config(page_title="Minha Página", layout="wide")
+st.set_page_config(page_title="Gestão de Corte", layout="wide")
 
 barra_navegacao()  # Exibe a barra no topo
 
@@ -44,7 +42,7 @@ for trabalho in trabalhos:
     if trabalho.get("Data Prevista"):
         try:
             data_fmt = "/".join(reversed(trabalho["Data Prevista"].split("-")))
-            titulo += f" | 🗕 {data_fmt}"
+            titulo += f" | 📅 {data_fmt}"
         except:
             pass
 
@@ -63,15 +61,11 @@ for trabalho in trabalhos:
                     st.markdown(f"**Tempo Total:** {item['Tempo Total']}")
 
                 with col2:
-                    caminho_pdf = item.get("Caminho PDF") or item.get("Caminho")
-                    if caminho_pdf and Path(caminho_pdf).exists():
-                        preview_path = gerar_preview_pdf(caminho_pdf)
-                        if preview_path:
-                            st.image(preview_path, caption=f"CNC {item['CNC']}", use_container_width="auto")
+                        caminho_pdf = item.get("Caminho")
+                        if caminho_pdf:
+                            st.image(caminho_pdf, caption=f"CNC {item['CNC']}", use_container_width="auto")
                         else:
-                            st.warning("Erro ao gerar preview.")
-                    else:
-                        st.warning("Arquivo PDF não encontrado.")
+                            st.warning("Arquivo PDF não encontrado.")
 
         maquina_escolhida = st.selectbox("Enviar para:", MAQUINAS, key=f"sel_maquina_{trabalho['Grupo']}")
         if st.button("➕ Adicionar à máquina", key=f"btn_{trabalho['Grupo']}"):
@@ -82,7 +76,8 @@ for trabalho in trabalhos:
                     "Material": trabalho["Material"],
                     "Espessura": trabalho["Espessura"],
                     "Quantidade": item["Qtd Chapas"],
-                    "Tempo Total": item["Tempo Total"]
+                    "Tempo Total": item["Tempo Total"],
+                    "Caminho": item.get("Caminho", "")
                 })
 
                 # NOVO: registra os dados completos para possível retorno
@@ -96,14 +91,13 @@ for trabalho in trabalhos:
                     tempo_total=item["Tempo Total"],
                     programador=item.get("Programador", "DESCONHECIDO"),
                     data_prevista=trabalho.get("Data Prevista"),
-                    processos=trabalho.get("Processos")
+                    processos=trabalho.get("Processos"),
                 )
 
             # Remove o arquivo após registrar
             caminho_txt = Path("autorizados") / f"{trabalho['Grupo']}.txt"
             if caminho_txt.exists():
                 caminho_txt.unlink()
-
 
             st.success(f"Trabalho enviado para {maquina_escolhida}")
             st.rerun()
@@ -167,49 +161,31 @@ for i, maquina in enumerate(MAQUINAS):
                     "Material": item[4],
                     "Espessura": item[5],
                     "Quantidade": item[6],
-                    "Tempo Total": item[7],
+                    "Tempo": item[7],
+                    "Caminho": item[8] if len(item) > 8 else "",  # proteção caso banco antigo
+                    "Local Separado": ""
                 }
 
-                # Geração do caminho do PDF com base no nome da proposta + CNC
-                nome_pdf = f"{item_dict['Proposta']}_{item_dict['CNC']}.pdf"
-                caminho_pdf = Path("autorizados") / nome_pdf
-
-                if caminho_pdf.exists():
-                    preview_path = gerar_preview_pdf(caminho_pdf)
-                    if preview_path:
-                        item_dict["Imagem"] = f"[Ver Imagem]({preview_path.as_posix()})"
-                    else:
-                        item_dict["Imagem"] = "Erro preview"
-                else:
-                    item_dict["Imagem"] = "PDF não encontrado"
-
-                item_dict["Separado"] = ""  # Campo manual, editável
                 dados_fila.append(item_dict)
-
-                # Para dropdown de seleção do CNC
                 chave_opcao = f"{item_dict['Proposta']} | CNC {item_dict['CNC']}"
                 opcoes[chave_opcao] = item_dict["ID"]
 
-            # Criar DataFrame
-            df = pd.DataFrame(dados_fila)
+            df_visual = pd.DataFrame(dados_fila)
 
-            # Editor do campo "Separado"
-            edited_df = st.data_editor(
-                df.drop(columns=["Imagem", "ID", "Máquina"]),
-                column_config={
-                    "Separado": st.column_config.TextColumn("Separado (Local)", required=False),
-                },
-                use_container_width=True,
-                hide_index=True
+            # Mostrar o DataFrame com colunas desejadas 
+            config = {
+                "Caminho": st.column_config.ImageColumn(),
+            }
+
+            st.data_editor(
+                df_visual[["Local Separado", "Proposta", "Material", "Espessura", "CNC", "Quantidade", "Tempo", "Caminho"]],
+                column_config=config,
+                hide_index=True,
+                use_container_width=True
             )
 
-            # Mostrar links de imagem em formato markdown
-            st.markdown("### 🔗 Links para Visualizar Imagem")
-            st.markdown(df[["Proposta", "CNC", "Imagem"]].to_markdown(index=False), unsafe_allow_html=True)
-
-            # Dropdown para iniciar corte
+            # Botões
             escolha = st.selectbox("Escolha próximo CNC:", list(opcoes.keys()), key=f"escolha_{maquina}")
-
             col_iniciar, col_ret, col_excluir_fila = st.columns(3)
 
             with col_iniciar:

@@ -4,5 +4,5 @@ Material: A36
 Programador: Felipe
 Qtd Chapas: 1
 Tempo Total: 00:06:22.28
+Caminho: https://res.cloudinary.com/dm6vke2eo/image/upload/v1752760153/previews_pdf/1489.png
 CNC: 1489
-Caminho: C:\Users\Microns\Desktop\Sistema_ERP_Laser\CNC\1489.pdf

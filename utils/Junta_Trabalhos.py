@@ -55,7 +55,7 @@ def carregar_trabalhos(pasta="autorizados"):
                     "Programador": dados.get("Programador", ""),
                     "Qtd Chapas": dados.get("Qtd Chapas", "1"),
                     "Tempo Total": dados.get("Tempo Total", ""),
-                    "Caminho PDF": dados.get("Caminho", "")
+                    "Caminho": dados.get("Caminho", "")
                 })
 
     df = pd.DataFrame(registros)

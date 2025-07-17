@@ -4,5 +4,5 @@ Material: AISI304
 Programador: Felipe
 Qtd Chapas: 1
 Tempo Total: 00:02:44.87
+Caminho: https://res.cloudinary.com/dm6vke2eo/image/upload/v1752760152/previews_pdf/1413.png
 CNC: 1413
-Caminho: C:\Users\Microns\Desktop\Sistema_ERP_Laser\CNC\1413.pdf
