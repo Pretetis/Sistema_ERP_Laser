@@ -3,6 +3,7 @@ from pathlib import Path
 import pandas as pd
 from utils.Junta_Trabalhos import carregar_trabalhos
 from utils.cloudinary_txt import enviar_txt_cloudinary
+from utils.cloudinary_txt import deletar_txt_cloudinary
 from utils.db import (
     criar_banco, adicionar_na_fila, obter_fila,
     obter_corte_atual, iniciar_corte, finalizar_corte,
@@ -33,6 +34,7 @@ st.title("🛠️ Gestão de Produção")
 # =====================
 st.sidebar.title("📋 Trabalhos Pendentes")
 trabalhos = carregar_trabalhos()
+trabalhos_pendentes = trabalhos["trabalhos_pendentes"]
 
 for trabalho in trabalhos:
     titulo = (
@@ -99,12 +101,14 @@ for trabalho in trabalhos:
             caminho_txt = Path("autorizados") / f"{trabalho['Grupo']}.txt"
             if caminho_txt.exists():
                 caminho_txt.unlink()
+                deletar_txt_cloudinary(caminho_txt.name)
 
             st.success(f"Trabalho enviado para {maquina_escolhida}")
             st.rerun()
 
         if st.button("🗑 Excluir Pendente", key=f"exc_pend_{trabalho['Grupo']}"):
             excluir_pendente(trabalho["Grupo"])
+            deletar_txt_cloudinary(f"{trabalho['Grupo']}.txt")
             st.success("Trabalho pendente excluído")
             st.rerun()
 

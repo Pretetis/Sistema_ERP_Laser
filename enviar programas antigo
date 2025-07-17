@@ -1,12 +1,17 @@
 import streamlit as st
+from pathlib import Path
 import sys
 from pathlib import Path
 from streamlit_autorefresh import st_autorefresh
 from io import BytesIO
-from utils.cloudinary_txt import enviar_txt_cloudinary, deletar_txt_cloudinary
+
+from utils.cloudinary_txt import enviar_txt_cloudinary
 from utils.extracao import extrair_dados_por_posicao
 from utils.Junta_Trabalhos import carregar_trabalhos
 from utils.navegacao import barra_navegacao
+from utils.cloudinary_txt import deletar_txt_cloudinary
+
+#st_autorefresh(interval=7000, key="data_refresh")
 
 # Adiciona caminho do projeto para importar corretamente
 sys.path.append(str(Path(__file__).resolve().parent.parent))
@@ -25,6 +30,17 @@ st.markdown(
         unsafe_allow_html=True,
     )
 
+# Caminhos das pastas
+RAIZ = Path(__file__).resolve().parent.parent
+PASTA_PDF = RAIZ / "CNC"
+PASTA_TXT_PRONTOS = RAIZ / "Programas_Prontos"
+PASTA_AUTORIZADOS = RAIZ / "autorizados"
+
+# Garante que as pastas existem
+PASTA_PDF.mkdir(exist_ok=True)
+PASTA_TXT_PRONTOS.mkdir(exist_ok=True)
+PASTA_AUTORIZADOS.mkdir(exist_ok=True)
+
 # =====================
 # 1. Upload dos PDFs
 # =====================
@@ -35,11 +51,14 @@ if st.button("📥 Processar PDFs"):
     registros = []
 
     for pdf in pdfs:
-        # Processa o PDF diretamente sem salvar localmente
-        info = extrair_dados_por_posicao(pdf)
+        caminho_pdf = PASTA_PDF / pdf.name
+        with open(caminho_pdf, "wb") as f:
+            f.write(pdf.read())
+
+        info = extrair_dados_por_posicao(caminho_pdf)
 
         if info:
-            info["CNC"] = pdf.name
+            info["CNC"] = caminho_pdf.stem
             registros.append(info)
 
     # Agrupamento por chave: Proposta-Espessura-Material
@@ -62,11 +81,13 @@ if st.button("📥 Processar PDFs"):
             linhas.append("")
 
         conteudo = "\n".join(linhas)
-        # Envia diretamente para o Cloudinary
-        nome_arquivo = f"{chave}.txt"  # chave é a string que você usa para agrupar, ok?
-        enviar_txt_cloudinary(conteudo, nome_arquivo=nome_arquivo, pasta="aguardando_aprovacao")
+        arquivo_temp = Path(f"{chave}.txt")
+        arquivo_temp.write_text(conteudo, encoding="utf-8")
+        enviar_txt_cloudinary(arquivo_temp, pasta="aguardando_aprovacao")
+        arquivo_temp.unlink()
 
-    st.success("Arquivos agrupados e enviados ao Cloudinary com sucesso!")
+
+    st.success("Arquivos agrupados salvos em 'Programas_Prontos'")
 
 # =====================
 # 2. Trabalhos pendentes agrupados
@@ -145,15 +166,13 @@ else:
                                     linhas.append(f"Caminho: {detalhe['Caminho']}")
                                     linhas.append("")
 
-                                # Envia para o Cloudinary
-                                conteudo = "\n".join(linhas)
-                                nome_arquivo = f"{trabalho['Grupo']}.txt"
-                                enviar_txt_cloudinary(conteudo, nome_arquivo=nome_arquivo, pasta="trabalhos_pendentes")
+                                caminho_txt = PASTA_TXT_PRONTOS / f"{trabalho['Grupo']}.txt"
+                                with open(caminho_txt, "w", encoding="utf-8") as f:
+                                    f.write("\n".join(linhas))
 
                     with col2:
-                        # Exibindo a imagem do PDF sem salvar localmente
                         caminho_pdf = item.get("Caminho")
-                        st.image(caminho_pdf, caption=f"CNC {item['CNC']}", use_container_width="auto")
+                        st.image(str(caminho_pdf), caption=f"CNC {item['CNC']}", use_container_width="auto")
 
             col1, col2 = st.columns(2)
             with col1:
@@ -162,36 +181,47 @@ else:
                     data_str = str(data_processo)
                     processos_str = ", ".join(processos_final) if processos_final else "Somente Corte"
 
-                    # Prepara as informações complementares
-                    nome_arquivo = f"{trabalho['Grupo']}.txt"
+                    origem = f"{trabalho['Grupo']}.txt"
+                    origem_path = PASTA_TXT_PRONTOS / origem
+                    destino_path = PASTA_AUTORIZADOS / origem
 
-                    # Primeiro, recupera o conteúdo atual da pasta aguardando_aprovacao
-                    from utils.cloudinary_txt import baixar_txt_cloudinary_conteudo  # Você precisa ter essa função implementada
-                    conteudo_atual = baixar_txt_cloudinary_conteudo(nome_arquivo, pasta="aguardando_aprovacao")
+                    if origem_path.exists():
+                        # Lê o conteúdo original
+                        with open(origem_path, "r", encoding="utf-8") as f:
+                            conteudo_original = f.read()
 
-                    # Complementa com as informações adicionais
-                    conteudo_complementado = (
-                        conteudo_atual + "\n"
-                        + "===== INFORMAÇÕES ADICIONAIS =====\n"
-                        + f"Data prevista: {data_str}\n"
-                        + f"Processos: {processos_str}\n"
-                    )
+                        # Adiciona os dados extras ao final
+                        conteudo_complementado = (
+                            conteudo_original.strip()
+                            + "\n\n"
+                            + "===== INFORMAÇÕES ADICIONAIS =====\n"
+                            + f"Data prevista: {data_str}\n"
+                            + f"Processos: {processos_str}\n"
+                        )
 
-                    # Envia para a pasta TRABALHOS_PENDENTES
-                    enviar_txt_cloudinary(conteudo_complementado, nome_arquivo=nome_arquivo, pasta="trabalhos_pendentes")
+                        # Salva no destino com o conteúdo completo
+                        with open(destino_path, "w", encoding="utf-8") as f:
+                            f.write(conteudo_complementado)
 
-                    # (Opcional) Também envia para a pasta AUTORIZADOS
-                    enviar_txt_cloudinary(conteudo_complementado, nome_arquivo=nome_arquivo, pasta="trabalhos_autorizados")
+                        # ✅ Envia para a pasta correta no Cloudinary
+                        enviar_txt_cloudinary(destino_path, pasta="trabalhos_pendentes")
 
-                    # Agora sim remove da aguardando_aprovacao
-                    deletar_txt_cloudinary(nome_arquivo, pasta="aguardando_aprovacao")
+                        # Limpa arquivos locais
+                        origem_path.unlink()
+                        destino_path.unlink()
 
-                    st.success(f"Trabalho do grupo {trabalho['Grupo']} autorizado.")
-                    st.rerun()
+                        # Remove do Cloudinary da pasta aguardando_aprovacao
+                        deletar_txt_cloudinary(origem, pasta="aguardando_aprovacao")
+
+                        st.success(f"Trabalho do grupo {trabalho['Grupo']} autorizado.")
+                        st.rerun()
 
             with col2:
                 if st.button("❌ Rejeitar", key=f"rej_{trabalho['Grupo']}"):
-                    # Remove do Cloudinary da pasta aguardando_aprovacao
-                    deletar_txt_cloudinary(f"{trabalho['Grupo']}.txt", pasta="aguardando_aprovacao")
+                    for item in trabalho["Detalhes"]:
+                        txt_path = PASTA_TXT_PRONTOS /  f"{trabalho['Grupo']}.txt"
+                        if txt_path.exists():
+                            txt_path.unlink()
+                            deletar_txt_cloudinary(f"{trabalho['Grupo']}.txt", pasta="aguardando_aprovacao")
                     st.warning(f"Trabalho do grupo {trabalho['Grupo']} rejeitado.")
                     st.rerun()

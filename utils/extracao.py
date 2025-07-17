@@ -1,6 +1,7 @@
 import fitz  # PyMuPDF
 from pathlib import Path
-from utils.visualizacao2 import gerar_preview_pdf
+from utils.visualizacao import gerar_preview_pdf
+from utils.cloudinary_txt import enviar_txt_cloudinary
 
 def extrair_dados_por_posicao(caminho_pdf):
     doc = fitz.open(caminho_pdf)
@@ -68,5 +69,14 @@ for arquivo in arquivos_pdf:
         # Salva o arquivo
         with open(caminho_arquivo, "w", encoding="utf-8") as f:
             f.write(conteudo)
+
+        # Lê o conteúdo do arquivo para string
+        conteudo = caminho_arquivo.read_text(encoding="utf-8")
+
+        # Extrai apenas o nome do arquivo para o Cloudinary
+        nome_arquivo = caminho_arquivo.name  # Ex: "PROP-0010-INOX-P001.txt"
+
+        # Envia corretamente para o Cloudinary
+        enviar_txt_cloudinary(conteudo, nome_arquivo=nome_arquivo, pasta="aguardando_aprovacao")
 
 print("✅ Arquivos individuais salvos em 'Programas_Prontos/'.")
