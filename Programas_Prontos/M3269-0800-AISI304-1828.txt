@@ -1,8 +1,0 @@
-Proposta: M3269
-Espessura (mm): 8.0
-Material: AISI304
-Programador: Lucas
-Qtd Chapas: 1
-Tempo Total: 00:05:10.29
-Caminho: https://res.cloudinary.com/dm6vke2eo/image/upload/v1752773582/previews_pdf/1828.png
-CNC: 1828
