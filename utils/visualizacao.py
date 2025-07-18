@@ -1,15 +1,8 @@
 from pathlib import Path
 from pdf2image import convert_from_path
-import cloudinary
-import cloudinary.uploader
 import streamlit as st
 
-# Configuração do Cloudinary
-cloudinary.config(
-    cloud_name="dm6vke2eo",
-    api_key="231723737594549",
-    api_secret="eZdQ3p0dq5sNDs_zidUhQgcwhZM"
-)
+from utils.supabase import upload_imagem_to_supabase
 
 def gerar_preview_pdf(pdf_path, pasta_destino="previews"):
     pdf_path = Path(pdf_path)
@@ -27,17 +20,13 @@ def gerar_preview_pdf(pdf_path, pasta_destino="previews"):
             st.exception(e)
             return None
 
-    # Upload da imagem para o Cloudinary
+    # Caminho no Supabase: ex: previews/arquivo.png
+    caminho_remoto = f"previews/{imagem_destino.name}"
+
     try:
-        response = cloudinary.uploader.upload(
-            str(imagem_destino),
-            folder="previews_pdf",  # pasta no Cloudinary (opcional)
-            public_id=pdf_path.stem,  # nome da imagem (sem extensão)
-            overwrite=True,
-            resource_type="image"
-        )
-        return response["secure_url"]  # URL HTTPS da imagem
+        url_imagem = upload_imagem_to_supabase(imagem_destino, destino=caminho_remoto)
+        return url_imagem
     except Exception as e:
-        st.error("Erro ao enviar imagem ao Cloudinary")
+        st.error("Erro ao enviar imagem ao Supabase")
         st.exception(e)
         return None

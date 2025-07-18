@@ -2,8 +2,8 @@ import streamlit as st
 import sys
 from pathlib import Path
 from streamlit_autorefresh import st_autorefresh
-from io import BytesIO
-from utils.cloudinary_txt import enviar_txt_cloudinary, deletar_txt_cloudinary
+
+from utils.supabase import upload_txt_to_supabase, deletar_arquivo_supabase, baixar_txt_conteudo
 from utils.extracao import extrair_dados_por_posicao
 from utils.Junta_Trabalhos import carregar_trabalhos
 from utils.navegacao import barra_navegacao
@@ -64,9 +64,9 @@ if st.button("📥 Processar PDFs"):
         conteudo = "\n".join(linhas)
         # Envia diretamente para o Cloudinary
         nome_arquivo = f"{chave}.txt"  # chave é a string que você usa para agrupar, ok?
-        enviar_txt_cloudinary(conteudo, nome_arquivo=nome_arquivo, pasta="aguardando_aprovacao")
+        upload_txt_to_supabase(nome_arquivo, conteudo, pasta="aguardando_aprovacao")
 
-    st.success("Arquivos agrupados e enviados ao Cloudinary com sucesso!")
+    st.success("Arquivos agrupados e enviados ao Supabase com sucesso!")
 
 # =====================
 # 2. Trabalhos pendentes agrupados
@@ -132,10 +132,6 @@ else:
                                 for detalhe in trabalho["Detalhes"]:
                                     # Garantir que "Caminho" não esteja vazio
                                     caminho = detalhe.get('Caminho')
-                                    if not caminho and 'CNC' in detalhe:
-                                        possivel = PASTA_PDF / f"{detalhe['CNC']}.pdf"
-                                        caminho = str(possivel.resolve()) if possivel.exists() else ""
-
                                     detalhe['Caminho'] = caminho or "Caminho desconhecido"
 
                                     linhas.append(f"Programador: {detalhe['Programador']}")
@@ -148,12 +144,15 @@ else:
                                 # Envia para o Cloudinary
                                 conteudo = "\n".join(linhas)
                                 nome_arquivo = f"{trabalho['Grupo']}.txt"
-                                enviar_txt_cloudinary(conteudo, nome_arquivo=nome_arquivo, pasta="trabalhos_pendentes")
+                                upload_txt_to_supabase(nome_arquivo, conteudo, pasta="trabalhos_pendentes")
 
                     with col2:
                         # Exibindo a imagem do PDF sem salvar localmente
                         caminho_pdf = item.get("Caminho")
-                        st.image(caminho_pdf, caption=f"CNC {item['CNC']}", use_container_width="auto")
+                        if caminho_pdf:
+                            st.image(caminho_pdf, caption=f"CNC {item['CNC']}", use_container_width=True)
+                        else:
+                            st.warning("Pré-visualização indisponível.")
 
             col1, col2 = st.columns(2)
             with col1:
@@ -166,8 +165,7 @@ else:
                     nome_arquivo = f"{trabalho['Grupo']}.txt"
 
                     # Primeiro, recupera o conteúdo atual da pasta aguardando_aprovacao
-                    from utils.cloudinary_txt import baixar_txt_cloudinary_conteudo  # Você precisa ter essa função implementada
-                    conteudo_atual = baixar_txt_cloudinary_conteudo(nome_arquivo, pasta="aguardando_aprovacao")
+                    conteudo_atual = baixar_txt_conteudo(nome_arquivo, bucket="aguardando_aprovacao")
 
                     # Complementa com as informações adicionais
                     conteudo_complementado = (
@@ -178,13 +176,10 @@ else:
                     )
 
                     # Envia para a pasta TRABALHOS_PENDENTES
-                    enviar_txt_cloudinary(conteudo_complementado, nome_arquivo=nome_arquivo, pasta="trabalhos_pendentes")
-
-                    # (Opcional) Também envia para a pasta AUTORIZADOS
-                    enviar_txt_cloudinary(conteudo_complementado, nome_arquivo=nome_arquivo, pasta="trabalhos_autorizados")
+                    upload_txt_to_supabase(nome_arquivo, conteudo_complementado, pasta="trabalhos_pendentes")
 
                     # Agora sim remove da aguardando_aprovacao
-                    deletar_txt_cloudinary(nome_arquivo, pasta="aguardando_aprovacao")
+                    deletar_arquivo_supabase(nome_arquivo, bucket="aguardando_aprovacao")
 
                     st.success(f"Trabalho do grupo {trabalho['Grupo']} autorizado.")
                     st.rerun()
@@ -192,6 +187,6 @@ else:
             with col2:
                 if st.button("❌ Rejeitar", key=f"rej_{trabalho['Grupo']}"):
                     # Remove do Cloudinary da pasta aguardando_aprovacao
-                    deletar_txt_cloudinary(f"{trabalho['Grupo']}.txt", pasta="aguardando_aprovacao")
+                    deletar_arquivo_supabase(f"{trabalho['Grupo']}.txt", bucket="aguardando_aprovacao")
                     st.warning(f"Trabalho do grupo {trabalho['Grupo']} rejeitado.")
                     st.rerun()

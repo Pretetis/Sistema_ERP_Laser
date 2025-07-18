@@ -1,14 +1,47 @@
 import fitz  # PyMuPDF
+import tempfile
 from pathlib import Path
-from utils.visualizacao import gerar_preview_pdf
-from utils.cloudinary_txt import enviar_txt_cloudinary
 
-def extrair_dados_por_posicao(caminho_pdf):
-    doc = fitz.open(caminho_pdf)
+from utils.supabase import upload_txt_to_supabase, upload_imagem_to_supabase
+
+# 🗂️ Pastas
+pasta_cnc = Path("CNC")
+pasta_saida = Path("Programas_Prontos")
+pasta_saida.mkdir(exist_ok=True)
+
+
+def gerar_preview_pdf(path_pdf: Path) -> str:
+    """Gera uma imagem da primeira página do PDF e faz upload no Supabase."""
+    doc = fitz.open(str(path_pdf))
+    pix = doc[0].get_pixmap(dpi=150)
+    caminho_imagem = path_pdf.with_suffix(".png")
+    pix.save(str(caminho_imagem))
+    
+    # Envia a imagem para o Supabase
+    link_publico = upload_imagem_to_supabase(caminho_imagem, destino=caminho_imagem.name)
+
+    # Remove imagem local após upload (opcional)
+    caminho_imagem.unlink(missing_ok=True)
+
+    return link_publico
+
+
+def extrair_dados_por_posicao(arquivo_pdf):
+    arquivo_pdf.seek(0)
+    doc = fitz.open(stream=arquivo_pdf, filetype="pdf")
     pagina = doc[0]
     blocos = pagina.get_text("blocks")
 
-    link_cloudinary = gerar_preview_pdf(caminho_pdf)
+    # Salva temporariamente para gerar o preview
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+        tmp_file.write(arquivo_pdf.read())
+        caminho_temp = Path(tmp_file.name)
+
+    # Gera preview usando o caminho temporário
+    link_supabase = gerar_preview_pdf(caminho_temp)
+
+    # Volta o ponteiro para o início se quiser reutilizar
+    arquivo_pdf.seek(0)
 
     proposta = espessura = material = programador = tempo_total = None
     qtd_chapas = 0
@@ -39,44 +72,33 @@ def extrair_dados_por_posicao(caminho_pdf):
             "Programador": programador,
             "Qtd Chapas": qtd_chapas,
             "Tempo Total": tempo_total,
-            "Caminho": link_cloudinary
+            "Caminho": link_supabase
         }
     else:
         return None
 
-# 🗂️ Pastas
-pasta_cnc = Path("CNC")
-pasta_saida = Path("Programas_Prontos")
-pasta_saida.mkdir(exist_ok=True)
 
 # 🔍 Processa PDFs da pasta CNC
 arquivos_pdf = list(pasta_cnc.glob("*.pdf"))
 
 for arquivo in arquivos_pdf:
-    info = extrair_dados_por_posicao(arquivo)
+    with arquivo.open("rb") as f:
+        info = extrair_dados_por_posicao(f)
     if info:
         info["CNC"] = arquivo.stem
 
-        # Cria nome do arquivo com base nas colunas
         espessura_raw = info["Espessura (mm)"]
         espessura_formatada = f"{int(round(espessura_raw * 100)):04d}"
-        nome_arquivo = f"{info['Proposta']}-{espessura_formatada}-{info['Material']}-{info['CNC']}.txt"
+        nome_arquivo = f"aguardando_aprovacao-{info['Proposta']}-{espessura_formatada}-{info['Material']}-{info['CNC']}.txt"
         caminho_arquivo = pasta_saida / nome_arquivo
 
-        # Conteúdo do arquivo
         conteudo = "\n".join([f"{chave}: {valor}" for chave, valor in info.items()])
+        caminho_arquivo.write_text(conteudo, encoding="utf-8")
 
-        # Salva o arquivo
-        with open(caminho_arquivo, "w", encoding="utf-8") as f:
-            f.write(conteudo)
-
-        # Lê o conteúdo do arquivo para string
+        # Releitura (opcional)
         conteudo = caminho_arquivo.read_text(encoding="utf-8")
 
-        # Extrai apenas o nome do arquivo para o Cloudinary
-        nome_arquivo = caminho_arquivo.name  # Ex: "PROP-0010-INOX-P001.txt"
+        # Upload para Supabase
+        upload_txt_to_supabase(nome_arquivo, conteudo)
 
-        # Envia corretamente para o Cloudinary
-        enviar_txt_cloudinary(conteudo, nome_arquivo=nome_arquivo, pasta="aguardando_aprovacao")
-
-print("✅ Arquivos individuais salvos em 'Programas_Prontos/'.")
+print("✅ Arquivos individuais salvos em 'Programas_Prontos/' e enviados ao Supabase.")

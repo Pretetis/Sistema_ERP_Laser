@@ -1,0 +1,19 @@
+# Ignorar credenciais
+credentials
+.env
+
+# Ignorar arquivos temporários
+*.pyc
+utils/__pycache__/
+tmp/
+*.log
+
+# Ignorar diretórios específicos
+venv/
+.env/
+
+#ignorar o db
+estado_maquinas.db
+
+#ignorar as imagens
+previews/

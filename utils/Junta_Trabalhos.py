@@ -2,8 +2,13 @@ from pathlib import Path
 import pandas as pd
 import tempfile
 
-from utils.cloudinary_txt import listar_txts_cloudinary, baixar_txt_cloudinary
+from utils.supabase import listar_txts_supabase, baixar_txt_para_disco
 
+# Caso queira separar categorias por prefixo no nome dos arquivos no Supabase:
+PREFIXOS_CATEGORIAS = {
+    "aguardando_aprovacao": "aguardando_aprovacao",
+    "trabalhos_pendentes": "trabalhos_pendentes"
+}
 
 def carregar_trabalhos():
     trabalhos = {
@@ -11,32 +16,26 @@ def carregar_trabalhos():
         "trabalhos_pendentes": []
     }
 
-    for categoria, cloud_pasta in {
-        "aguardando_aprovacao": "aguardando_aprovacao",
-        "trabalhos_pendentes": "trabalhos_pendentes"
-    }.items():
+    for categoria in ["aguardando_aprovacao", "trabalhos_pendentes"]:
         registros = []
         infos_adicionais = {}
-        arquivos_txt = []
 
-        grupos = listar_txts_cloudinary(pasta=cloud_pasta)
-        for grupo in grupos:
-            nome_arquivo = grupo
-            destino = Path(tempfile.gettempdir()) / nome_arquivo
-            sucesso = baixar_txt_cloudinary(nome_arquivo, destino, pasta=cloud_pasta)
-            if sucesso:
-                arquivos_txt.append(destino)
+        prefixo = PREFIXOS_CATEGORIAS[categoria]
+        todos_arquivos = listar_txts_supabase(prefixo)
+        arquivos_categoria = [arq for arq in todos_arquivos if arq.startswith(prefixo)]
 
-        for txt in arquivos_txt:
-            partes = txt.stem.split("-")
-            if len(partes) < 3:
+        for nome_arquivo in arquivos_categoria:
+            partes_nome = Path(nome_arquivo).stem.split("-")
+            if len(partes_nome) < 3:
                 continue
 
-            chave_grupo = "-".join(partes[:3])
-            with open(txt, "r", encoding="utf-8") as f:
-                conteudo = f.read().strip()
+            chave_grupo = "-".join(partes_nome[:3])
+            try:
+                conteudo = baixar_txt_conteudo(nome_arquivo)
+            except Exception:
+                continue
 
-            blocos = conteudo.split("\n\n")
+            blocos = conteudo.strip().split("\n\n")
 
             for bloco in blocos:
                 if "===== INFORMAÇÕES ADICIONAIS =====" in bloco:
@@ -59,9 +58,9 @@ def carregar_trabalhos():
                 if dados.get("CNC"):
                     registros.append({
                         "Grupo": chave_grupo,
-                        "Proposta": partes[0],
-                        "Espessura": float(partes[1]) / 100,
-                        "Material": partes[2],
+                        "Proposta": partes_nome[0],
+                        "Espessura": float(partes_nome[1]) / 100,
+                        "Material": partes_nome[2],
                         "CNC": dados.get("CNC", ""),
                         "Programador": dados.get("Programador", ""),
                         "Qtd Chapas": dados.get("Qtd Chapas", "1"),

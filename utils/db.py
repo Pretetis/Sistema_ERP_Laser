@@ -1,10 +1,8 @@
-# utils/db.py
-
 import sqlite3
 from pathlib import Path
 from datetime import datetime
 
-from utils.cloudinary_txt import enviar_txt_cloudinary
+from utils.supabase import upload_txt_to_supabase 
 
 DB_PATH = Path("estado_maquinas.db")
 
@@ -209,11 +207,8 @@ Data prevista: {data_prevista}
 Processos: {processos}
 """
 
-    # Criação temporária para upload
-    arquivo_temp = Path(f"{grupo}.txt")
-    arquivo_temp.write_text(conteudo, encoding="utf-8")
-    enviar_txt_cloudinary(arquivo_temp)
-    arquivo_temp.unlink()
+    nome_arquivo = f"trabalhos_pendentes-{grupo}-{cnc}.txt"
+    upload_txt_to_supabase(nome_arquivo, conteudo)  # ✅ Substituído
 
     excluir_do_corte(maquina)
 
@@ -261,9 +256,7 @@ Data prevista: {data_prevista}
 Processos: {processos}
 """
 
-    arquivo_temp = Path(f"{grupo}.txt")
-    arquivo_temp.write_text(conteudo, encoding="utf-8")
-    enviar_txt_cloudinary(arquivo_temp)
-    arquivo_temp.unlink()
+    nome_arquivo = f"trabalhos_pendentes-{grupo}-{cnc}.txt"
+    upload_txt_to_supabase(nome_arquivo, conteudo)  # ✅ Substituído
 
-    excluir_da_fila("", id_trabalho)  # "" já é ignorado no SQL
+    excluir_da_fila("", id_trabalho)
