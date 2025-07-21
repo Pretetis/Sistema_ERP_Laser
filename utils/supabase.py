@@ -1,6 +1,7 @@
 from supabase import create_client, Client
 from pathlib import Path
 from dotenv import load_dotenv
+import streamlit as st
 import os
 import time
 import tempfile
@@ -9,8 +10,11 @@ import io
 # Carrega as variáveis do .env
 load_dotenv()
 
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+#SUPABASE_URL = os.getenv("SUPABASE_URL")
+#SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 
 # Cria o cliente
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
