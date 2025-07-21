@@ -5,3 +5,6 @@ pymupdf
 pdf2image
 cloudinary
 supabase
+requests
+Pillow
+python-dotenv
