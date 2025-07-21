@@ -11,7 +11,7 @@ def adicionar_na_fila(maquina, trabalho):
         "cnc": trabalho["cnc"],
         "material": trabalho["material"],
         "espessura": trabalho["espessura"],
-        "quantidade": trabalho["quantidade"],
+        "qtd_chapas": int(trabalho["qtd_chapas"]),
         "tempo_total": trabalho["tempo_total"],
         "caminho": trabalho.get("caminho", "")
     }).execute()
@@ -41,7 +41,7 @@ def iniciar_corte(maquina, id_fila):
         "cnc": item["cnc"],
         "material": item["material"],
         "espessura": item["espessura"],
-        "quantidade": item["quantidade"],
+        "qtd_chapas": item["qtd_chapas"],
         "tempo_total": item["tempo_total"]
     }).execute()
 
@@ -51,8 +51,8 @@ def finalizar_corte(maquina):
     if not atual:
         return
 
-    if atual["quantidade"] > 1:
-        supabase.table("corte_atual").update({"quantidade": atual["quantidade"] - 1}).eq("maquina", maquina).execute()
+    if atual["qtd_chapas"] > 1:
+        supabase.table("corte_atual").update({"qtd_chapas": atual["qtd_chapas"] - 1}).eq("maquina", maquina).execute()
     else:
         supabase.table("corte_atual").delete().eq("maquina", maquina).execute()
 
@@ -84,12 +84,12 @@ def retornar_para_pendentes(maquina):
         "cnc": atual["cnc"],
         "material": atual["material"],
         "espessura": atual["espessura"],
-        "quantidade": atual["quantidade"],
+        "qtd_chapas": atual["qtd_chapas"],
         "tempo_total": atual["tempo_total"],
         "programador": dados.get("programador", "DESCONHECIDO"),
         "data_prevista": dados.get("data_prevista", str(datetime.today().date())),
-        "processos": dados.get("processos", "Corte Retornado"),
-        "autorizado": False,
+        "processos": dados.get("processos") if dados.get("processos") else ["Corte Retornado"],
+        "autorizado": True,
         "caminho": atual.get("caminho", f"CNC/{atual['cnc']}.pdf")
     }
 
@@ -118,12 +118,12 @@ def retornar_item_da_fila_para_pendentes(id_trabalho):
         "cnc": item["cnc"],
         "material": item["material"],
         "espessura": item["espessura"],
-        "quantidade": item["quantidade"],
+        "qtd_chapas": item["qtd_chapas"],
         "tempo_total": item["tempo_total"],
         "programador": dados.get("programador", "DESCONHECIDO"),
         "data_prevista": dados.get("data_prevista", str(datetime.today().date())),
-        "processos": dados.get("processos", "Corte Retornado"),
-        "autorizado": False,
+        "processos": dados.get("processos") if dados.get("processos") else ["Corte Retornado"],
+        "autorizado": True,
         "caminho": item.get("caminho", f"CNC/{item['cnc']}.pdf")
     }
 
@@ -131,7 +131,7 @@ def retornar_item_da_fila_para_pendentes(id_trabalho):
     excluir_da_fila(item["maquina"], id_trabalho)
 
 def atualizar_quantidade(maquina, nova_quantidade):
-    supabase.table("corte_atual").update({"quantidade": nova_quantidade}).eq("maquina", maquina).execute()
+    supabase.table("corte_atual").update({"qtd_chapas": nova_quantidade}).eq("maquina", maquina).execute()
 
 
 def atualizar_trabalho_pendente(cnc, grupo, tempo_total, data_prevista=None, processos=None, autorizado=False):

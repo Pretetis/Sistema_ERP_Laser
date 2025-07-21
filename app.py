@@ -14,7 +14,7 @@ from streamlit_autorefresh import st_autorefresh
 from utils.navegacao import barra_navegacao
 
 # Atualiza automaticamente a cada 7 segundos
-st_autorefresh(interval=7000, key="data_refresh")
+#st_autorefresh(interval=7000, key="data_refresh")
 
 st.set_page_config(page_title="Gestão de Corte", layout="wide")
 barra_navegacao()
@@ -69,7 +69,7 @@ for trabalho in trabalhos_pendentes:
                     "cnc": item.get("cnc", ""),
                     "material": trabalho.get("material", ""),
                     "espessura": trabalho.get("espessura", 0),
-                    "quantidade": item.get("qtd_chapas", 0),
+                    "qtd_chapas": item.get("qtd_chapas", 0),
                     "tempo_total": item.get("tempo_total", ""),
                     "caminho": item.get("caminho", "")
                 })
@@ -102,7 +102,7 @@ for i, maquina in enumerate(MAQUINAS):
 
         if corte:
             st.markdown(
-                f"**🔹 Corte Atual:** {corte.get('quantidade', 'N/D')} | CNC {corte.get('cnc', 'N/D')} | "
+                f"**🔹 Corte Atual:** {corte.get('qtd_chapas', 'N/D')} | CNC {corte.get('cnc', 'N/D')} | "
                 f"{corte.get('material', 'N/D')} | {corte.get('espessura', 'N/D')} mm"
             )
             col_fim, col_ret, col_exc = st.columns(3)
@@ -141,7 +141,7 @@ for i, maquina in enumerate(MAQUINAS):
                     "CNC": item.get("cnc"),
                     "Material": item.get("material"),
                     "Espessura": item.get("espessura"),
-                    "Quantidade": item.get("quantidade"),
+                    "Quantidade": item.get("qtd_chapas"),
                     "Tempo": item.get("tempo_total"),
                     "Caminho": item.get("caminho", ""),
                     "Local Separado": ""
