@@ -1,30 +1,23 @@
 import streamlit as st
-from pathlib import Path
 import pandas as pd
 from utils.Junta_Trabalhos import carregar_trabalhos
-from utils.supabase import deletar_arquivo_supabase 
 from utils.db import (
-    adicionar_na_fila, obter_fila,
+    adicionar_na_fila, obter_fila, atualizar_trabalho_pendente,
     obter_corte_atual, iniciar_corte, finalizar_corte,
-    excluir_da_fila, excluir_do_corte,
-    excluir_pendente, retornar_para_pendentes,
-    registrar_trabalho_enviado, retornar_item_da_fila_para_pendentes
+    excluir_da_fila, excluir_do_corte, retornar_para_pendentes,
+    retornar_item_da_fila_para_pendentes, excluir_trabalhos_grupo
 )
 
 MAQUINAS = ["LASER 1", "LASER 2", "LASER 3", "LASER 4", "LASER 5", "LASER 6"]
 
 from streamlit_autorefresh import st_autorefresh
+from utils.navegacao import barra_navegacao
 
 # Atualiza automaticamente a cada 7 segundos
 st_autorefresh(interval=7000, key="data_refresh")
 
-from utils.navegacao import barra_navegacao
-
 st.set_page_config(page_title="Gestão de Corte", layout="wide")
-
-barra_navegacao()  # Exibe a barra no topo
-
-st.set_page_config(page_title="Gestão de Corte", layout="wide")
+barra_navegacao()
 st.title("🛠️ Gestão de Produção")
 
 # =====================
@@ -32,79 +25,66 @@ st.title("🛠️ Gestão de Produção")
 # =====================
 st.sidebar.title("📋 Trabalhos Pendentes")
 trabalhos = carregar_trabalhos()
-trabalhos_pendentes = trabalhos["trabalhos_pendentes"]
+trabalhos_pendentes = trabalhos.get("trabalhos_pendentes", [])
 
 for trabalho in trabalhos_pendentes:
     titulo = (
-        f"🔹 {trabalho['Proposta']} | {trabalho['Espessura']} mm | {trabalho['Material']} "
-        f"| x {trabalho['Qtd Total']} | ⏱ {trabalho['Tempo Total']}"
+        f"🔹 {trabalho.get('proposta', 'N/D')} | {trabalho.get('espessura', 'N/D')} mm | "
+        f"{trabalho.get('material', 'N/D')} | x {trabalho.get('qtd_total', 'N/D')} | "
+        f"⏱ {trabalho.get('tempo_total', 'N/D')}"
     )
 
-    if trabalho.get("Data Prevista"):
+    if trabalho.get("data_prevista"):
         try:
-            data_fmt = "/".join(reversed(trabalho["Data Prevista"].split("-")))
+            data_fmt = "/".join(reversed(trabalho["data_prevista"].split("-")))
             titulo += f" | 📅 {data_fmt}"
-        except:
+        except Exception:
             pass
 
-    if trabalho.get("Processos"):
-        titulo += f" | ⚙️ {trabalho['Processos']}"
+    if trabalho.get("processos"):
+        titulo += f" | ⚙️ {trabalho.get('processos')}"
 
     with st.sidebar.expander(titulo):
-        for item in trabalho["Detalhes"]:
+        for item in trabalho.get("detalhes", []):
             with st.container(border=True):
                 col1, col2 = st.columns([2, 2])
-
                 with col1:
-                    st.markdown(f"**Programador:** {item['Programador']}")
-                    st.markdown(f"**CNC:** {item['CNC']}")
-                    st.markdown(f"**Qtd Chapas:** {item['Qtd Chapas']}")
-                    st.markdown(f"**Tempo Total:** {item['Tempo Total']}")
+                    st.markdown(f"**Programador:** {item.get('programador', 'DESCONHECIDO')}")
+                    st.markdown(f"**CNC:** {item.get('cnc', 'DESCONHECIDO')}")
+                    st.markdown(f"**Qtd Chapas:** {item.get('qtd_chapas', 'DESCONHECIDO')}")
+                    st.markdown(f"**Tempo Total:** {item.get('tempo_total', 'DESCONHECIDO')}")
 
                 with col2:
-                        caminho_pdf = item.get("Caminho")
-                        if caminho_pdf and caminho_pdf.startswith("http") and caminho_pdf.endswith((".png", ".jpg", ".jpeg")):
-                            st.image(caminho_pdf, caption=f"CNC {item['CNC']}", use_container_width="auto")
-                        else:
-                            st.warning("Arquivo PDF não encontrado.")
+                    caminho_imagem = item.get("caminho")
+                    if caminho_imagem and caminho_imagem.startswith("http") and caminho_imagem.lower().endswith((".png", ".jpg", ".jpeg")):
+                        st.image(caminho_imagem, caption=f"CNC {item.get('cnc', '')}", use_container_width=True)
+                    else:
+                        st.warning("Imagem de pré-visualização não encontrada.")
 
-        maquina_escolhida = st.selectbox("Enviar para:", MAQUINAS, key=f"sel_maquina_{trabalho['Grupo']}")
-        if st.button("➕ Adicionar à máquina", key=f"btn_{trabalho['Grupo']}"):
-            for item in trabalho["Detalhes"]:
+        maquina_escolhida = st.selectbox("Enviar para:", MAQUINAS, key=f"sel_maquina_{trabalho.get('grupo', '')}")
+        if st.button("➕ Adicionar à máquina", key=f"btn_{trabalho.get('grupo', '')}"):
+            for item in trabalho.get("detalhes", []):
                 adicionar_na_fila(maquina_escolhida, {
-                    "Proposta": trabalho["Proposta"],
-                    "CNC": item["CNC"],
-                    "Material": trabalho["Material"],
-                    "Espessura": trabalho["Espessura"],
-                    "Quantidade": item["Qtd Chapas"],
-                    "Tempo Total": item["Tempo Total"],
-                    "Caminho": item.get("Caminho", "")
+                    "proposta": trabalho.get("proposta", ""),
+                    "cnc": item.get("cnc", ""),
+                    "material": trabalho.get("material", ""),
+                    "espessura": trabalho.get("espessura", 0),
+                    "quantidade": item.get("qtd_chapas", 0),
+                    "tempo_total": item.get("tempo_total", ""),
+                    "caminho": item.get("caminho", "")
                 })
 
-                # NOVO: registra os dados completos para possível retorno
-                registrar_trabalho_enviado(
-                    grupo=trabalho["Grupo"],
-                    proposta=trabalho["Proposta"],
-                    cnc=item["CNC"],
-                    material=trabalho["Material"],
-                    espessura=trabalho["Espessura"],
-                    quantidade=item["Qtd Chapas"],
-                    tempo_total=item["Tempo Total"],
-                    programador=item.get("Programador", "DESCONHECIDO"),
-                    data_prevista=trabalho.get("Data Prevista"),
-                    processos=trabalho.get("Processos"),
+                atualizar_trabalho_pendente(
+                    cnc=item.get("cnc", ""),
+                    grupo=trabalho.get("grupo", ""),
+                    tempo_total=item.get("tempo_total", ""),
+                    data_prevista=trabalho.get("data_prevista"),
+                    processos=trabalho.get("processos"),
+                    autorizado=True
                 )
 
-            nome_arquivo = f"{trabalho['Grupo']}.txt"
-            deletar_arquivo_supabase(f"trabalhos_pendentes/{nome_arquivo}")
+            excluir_trabalhos_grupo(trabalho.get("grupo", ""))
             st.success(f"Trabalho enviado para {maquina_escolhida}")
-            st.rerun()
-
-        if st.button("🗑 Excluir Pendente", key=f"exc_pend_{trabalho['Grupo']}"):
-            excluir_pendente(trabalho["Grupo"])
-            nome_arquivo = f"{trabalho['Grupo']}.txt"
-            deletar_arquivo_supabase(f"trabalhos_pendentes/{nome_arquivo}")
-            st.success("Trabalho pendente excluído")
             st.rerun()
 
 # =====================
@@ -122,7 +102,8 @@ for i, maquina in enumerate(MAQUINAS):
 
         if corte:
             st.markdown(
-                f"**🔹 Corte Atual:** {corte['quantidade']} | CNC {corte['cnc']} | {corte['material']} | {corte['espessura']} mm"
+                f"**🔹 Corte Atual:** {corte.get('quantidade', 'N/D')} | CNC {corte.get('cnc', 'N/D')} | "
+                f"{corte.get('material', 'N/D')} | {corte.get('espessura', 'N/D')} mm"
             )
             col_fim, col_ret, col_exc = st.columns(3)
 
@@ -154,25 +135,23 @@ for i, maquina in enumerate(MAQUINAS):
 
             for item in fila:
                 item_dict = {
-                    "ID": item["id"],
-                    "Máquina": item["maquina"],
-                    "Proposta": item["proposta"],
-                    "CNC": item["cnc"],
-                    "Material": item["material"],
-                    "Espessura": item["espessura"],
-                    "Quantidade": item["quantidade"],
-                    "Tempo": item["tempo_total"],
+                    "ID": item.get("id"),
+                    "Máquina": item.get("maquina"),
+                    "Proposta": item.get("proposta"),
+                    "CNC": item.get("cnc"),
+                    "Material": item.get("material"),
+                    "Espessura": item.get("espessura"),
+                    "Quantidade": item.get("quantidade"),
+                    "Tempo": item.get("tempo_total"),
                     "Caminho": item.get("caminho", ""),
                     "Local Separado": ""
-                }
-
+                                    }
                 dados_fila.append(item_dict)
                 chave_opcao = f"{item_dict['Proposta']} | CNC {item_dict['CNC']}"
                 opcoes[chave_opcao] = item_dict["ID"]
 
             df_visual = pd.DataFrame(dados_fila)
 
-            # Mostrar o DataFrame com colunas desejadas 
             config = {
                 "Caminho": st.column_config.ImageColumn(),
             }
@@ -184,7 +163,6 @@ for i, maquina in enumerate(MAQUINAS):
                 use_container_width=True
             )
 
-            # Botões
             escolha = st.selectbox("Escolha próximo CNC:", list(opcoes.keys()), key=f"escolha_{maquina}")
             col_iniciar, col_ret, col_excluir_fila = st.columns(3)
 

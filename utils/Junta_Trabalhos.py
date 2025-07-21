@@ -1,10 +1,6 @@
-from pathlib import Path
 import pandas as pd
-import re
+from utils.supabase import supabase
 
-from utils.supabase import listar_txts_supabase, baixar_txt_conteudo
-
-# Caso queira separar categorias por prefixo no nome dos arquivos no Supabase:
 PREFIXOS_CATEGORIAS = {
     "aguardando_aprovacao": "aguardando_aprovacao",
     "trabalhos_pendentes": "trabalhos_pendentes"
@@ -16,82 +12,52 @@ def carregar_trabalhos():
         "trabalhos_pendentes": []
     }
 
-    for categoria in ["aguardando_aprovacao", "trabalhos_pendentes"]:
-        registros = []
-        infos_adicionais = {}
+    res = supabase.table("trabalhos_pendentes").select("*").execute()
+    registros = res.data if res.data else []
+    df = pd.DataFrame(registros)
 
-        prefixo = PREFIXOS_CATEGORIAS[categoria]
-        todos_arquivos = listar_txts_supabase(prefixo)
-        arquivos_categoria = [arq for arq in todos_arquivos if arq.startswith(prefixo)]
+    if df.empty or "autorizado" not in df.columns:
+        df_autorizado = pd.DataFrame()
+        df_nao_autorizado = pd.DataFrame()
+    else:
+        df_autorizado = df[df["autorizado"] == True]
+        df_nao_autorizado = df[df["autorizado"] != True]
 
-        for nome_arquivo in arquivos_categoria:
-            partes_nome = Path(nome_arquivo).stem.split("-")
-            if len(partes_nome) < 3:
-                continue
-
-            chave_grupo = "-".join(partes_nome[:3])
-            try:
-                relativo = nome_arquivo.replace(f"{prefixo}/", "")
-                conteudo = baixar_txt_conteudo(relativo, pasta=prefixo)
-            except Exception:
-                continue
-
-            todos_blocos = re.split(r"\n\s*\n", conteudo.strip())
-            blocos = [b for b in todos_blocos if "Programador:" in b and "===== INFORMAÇÕES ADICIONAIS" not in b]
-
-
-            for bloco in blocos:
-                dados = {}
-                for linha in bloco.strip().splitlines():
-                    if ":" in linha:
-                        k, v = linha.split(":", 1)
-                        dados[k.strip()] = v.strip()
-
-                if dados.get("CNC"):
-                    registros.append({
-                        "Grupo": chave_grupo,
-                        "Proposta": partes_nome[0],
-                        "Espessura": float(partes_nome[1]) / 100,
-                        "Material": partes_nome[2],
-                        "CNC": dados.get("CNC", "").replace(".pdf", ""),
-                        "Programador": dados.get("Programador", ""),
-                        "Qtd Chapas": dados.get("Qtd Chapas", "1"),
-                        "Tempo Total": dados.get("Tempo Total", ""),
-                        "Caminho": dados.get("Caminho", "")
-                    })
-
-        df = pd.DataFrame(registros)
-        if df.empty:
+    for status, df_base in [("aguardando_aprovacao", df_nao_autorizado), ("trabalhos_pendentes", df_autorizado)]:
+        if df_base.empty:
             continue
 
-        trabalhos_categoria = []
-        for grupo_nome, subdf in df.groupby("Grupo"):
-            # Corrigir milissegundos para pandas aceitar corretamente
-            subdf["Tempo Total"] = subdf["Tempo Total"].str.replace(",", ".").str.extract(r"(\d{2}:\d{2}:\d{2})")[0]
-            tempos_validos = pd.to_timedelta(subdf["Tempo Total"], errors='coerce')
+        df_base["tempo_total"] = pd.to_timedelta(df_base["tempo_total"], errors="coerce")
 
-            tempo_total = tempos_validos.dropna().sum()
+        trabalhos_categoria = []
+        for grupo_nome, subdf in df_base.groupby("grupo"):
+            tempo_total = subdf["tempo_total"].dropna().sum()
             segundos = int(tempo_total.total_seconds())
-            tempo_formatado = f"{segundos // 3600:02} H:{(segundos % 3600) // 60:02} M:{segundos % 60:02} S"
+            tempo_formatado = f"{segundos // 3600:02}:{(segundos % 3600) // 60:02}:{segundos % 60:02}"
+
+            detalhes = subdf.copy()
+            detalhes["tempo_total"] = detalhes["tempo_total"].apply(
+                lambda x: (
+                    f"{int(x.total_seconds()) // 3600:02}:"
+                    f"{(int(x.total_seconds()) % 3600) // 60:02}:"
+                    f"{int(x.total_seconds()) % 60:02}"
+                ) if pd.notnull(x) else "00:00:00"
+            )
 
             trabalho = {
-                "Grupo": grupo_nome,
-                "Proposta": subdf.iloc[0]["Proposta"],
-                "Espessura": subdf.iloc[0]["Espessura"],
-                "Material": subdf.iloc[0]["Material"],
-                "Qtd Total": pd.to_numeric(subdf["Qtd Chapas"], errors='coerce').fillna(0).astype(int).sum(),
-                "Tempo Total": tempo_formatado,
-                "Detalhes": subdf.to_dict(orient="records")
+                "grupo": grupo_nome,
+                "proposta": subdf.iloc[0]["proposta"],
+                "espessura": subdf.iloc[0]["espessura"],
+                "material": subdf.iloc[0]["material"],
+                "qtd_total": subdf["qtd_chapas"].sum(),
+                "tempo_total": tempo_formatado,
+                "detalhes": detalhes.to_dict(orient="records"),
+                "data_prevista": subdf.iloc[0].get("data_prevista"),
+                "processos": subdf.iloc[0].get("processos"),
             }
-
-            extras = infos_adicionais.get(grupo_nome, {})
-            if extras.get("Data Prevista"):
-                trabalho["Data Prevista"] = extras["Data Prevista"]
-            if extras.get("Processos"):
-                trabalho["Processos"] = extras["Processos"]
 
             trabalhos_categoria.append(trabalho)
 
-        trabalhos[categoria] = trabalhos_categoria
+        trabalhos[status] = trabalhos_categoria
 
     return trabalhos

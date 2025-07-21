@@ -2,28 +2,26 @@ import streamlit as st
 import sys
 from pathlib import Path
 from streamlit_autorefresh import st_autorefresh
+import pandas as pd
 
-from utils.supabase import upload_txt_to_supabase, deletar_arquivo_supabase, baixar_txt_conteudo, upload_imagem_to_supabase
-from utils.extracao import extrair_dados_por_posicao, gerar_preview_pdf
+from utils.extracao import extrair_dados_por_posicao
 from utils.Junta_Trabalhos import carregar_trabalhos
 from utils.navegacao import barra_navegacao
+from utils.db import inserir_trabalho_pendente, atualizar_trabalho_pendente, excluir_trabalhos_grupo
 
 # Adiciona caminho do projeto para importar corretamente
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 st.set_page_config(page_title="Enviar Programas CNC", layout="wide")
 st.title("📤 Enviar Programas CNC")
-barra_navegacao()  # Exibe a barra no topo
+barra_navegacao()
 
-st.markdown(
-        """
-        <style>
-        .stExpander p {
-            font-size: 20px;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+st.markdown("""
+    <style>
+    .stExpander p {
+        font-size: 20px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
 # =====================
 # 1. Upload dos PDFs
@@ -31,42 +29,36 @@ st.markdown(
 st.markdown("Faça o upload dos arquivos `.pdf` dos programas CNC.")
 pdfs = st.file_uploader("Selecione os arquivos PDF", type="pdf", accept_multiple_files=True)
 
-if st.button("📥 Processar PDFs"):
-    registros = []
+from pathlib import Path
+import pandas as pd  # se ainda não importou
 
+if st.button("🗕️ Processar PDFs"):
     for pdf in pdfs:
-        # Processa o PDF diretamente sem salvar localmente
         info = extrair_dados_por_posicao(pdf)
-
         if info:
-            info["CNC"] = pdf.name
-            registros.append(info)
-
-    # Agrupamento por chave: Proposta-Espessura-Material
-    from collections import defaultdict
-    grupos = defaultdict(list)
-
-    for r in registros:
-        espessura_fmt = f"{int(round(r['Espessura (mm)'] * 100)):04d}"
-        chave = f"{r['Proposta']}-{espessura_fmt}-{r['Material']}"
-        grupos[chave].append(r)
-
-    for chave, lista in grupos.items():
-        linhas = []
-        for item in lista:
-            linhas.append(f"Programador: {item['Programador']}")
-            linhas.append(f"CNC: {item['CNC']}")
-            linhas.append(f"Qtd Chapas: {item['Qtd Chapas']}")
-            linhas.append(f"Tempo Total: {item['Tempo Total']}")
-            linhas.append(f"Caminho: {item['Caminho']}")
-            linhas.append("")
-
-        conteudo = "\n".join(linhas)
-        # Envia diretamente para o Cloudinary
-        nome_arquivo = f"{chave}.txt"  # chave é a string que você usa para agrupar, ok?
-        upload_txt_to_supabase(nome_arquivo, conteudo, pasta="aguardando_aprovacao")
-
-    st.success("Arquivos agrupados e enviados ao Supabase com sucesso!")
+            cnc = Path(pdf.name).stem  # Remove .pdf
+            
+            # Se tempo_total é string, converte para timedelta
+            tempo_td = pd.to_timedelta(info["tempo_total"]) if isinstance(info["tempo_total"], str) else info["tempo_total"]
+            
+            total_segundos = int(tempo_td.total_seconds())
+            tempo_formatado = f"{total_segundos // 3600:02}:{(total_segundos % 3600) // 60:02}:{total_segundos % 60:02}"
+            
+            inserir_trabalho_pendente({
+                "grupo": f"{info['proposta']}-{int(round(info['espessura']*100)):04d}-{info['material']}",
+                "proposta": info["proposta"],
+                "espessura": info["espessura"],
+                "material": info["material"],
+                "cnc": cnc,
+                "programador": info["programador"],
+                "qtd_chapas": info["qtd_chapas"],
+                "tempo_total": tempo_formatado,  # tempo formatado no padrão HH:MM:SS
+                "caminho": info["caminho"],
+                "data_prevista": None,
+                "processos": [],
+                "autorizado": False
+            })
+    st.success("PDFs processados e registrados no banco de dados!")
 
 # =====================
 # 2. Trabalhos pendentes agrupados
@@ -74,122 +66,86 @@ if st.button("📥 Processar PDFs"):
 st.markdown("---")
 st.subheader("🕓 Trabalhos aguardando autorização")
 
-trabalhos = carregar_trabalhos()
-trabalhos = trabalhos["aguardando_aprovacao"]
+trabalhos = carregar_trabalhos()["aguardando_aprovacao"]
 
 if not trabalhos:
     st.info("Nenhum trabalho pendente no momento.")
 else:
     for trabalho in trabalhos:
-        with st.expander(f"🔹 {trabalho['Proposta']} | {trabalho['Espessura']} mm | {trabalho['Material']} | x {trabalho['Qtd Total']} | ⏱ {trabalho['Tempo Total']}"):
+        with st.expander(
+            f"🔹 {trabalho['proposta']} | {trabalho['espessura']} mm | {trabalho['material']} "
+            f"| x {trabalho['qtd_total']} | ⏱ {trabalho['tempo_total']}"
+        ):
 
-            data_processo = st.date_input("Data", key=f"data_{trabalho['Grupo']}", format="DD/MM/YYYY")
+            data_processo = st.date_input("Data", key=f"data_{trabalho['grupo']}", format="DD/MM/YYYY")
             processos_possiveis = ["Dobra", "Usinagem", "Solda", "Gravação", "Galvanização", "Pintura"]
             col_processos = st.columns(len(processos_possiveis))
-            processos_selecionados = []
+            processos_selecionados = [
+                proc for i, proc in enumerate(processos_possiveis)
+                if col_processos[i].checkbox(proc, key=f"proc_{trabalho['grupo']}_{proc}")
+            ]
 
-            for i, processo in enumerate(processos_possiveis):
-                if col_processos[i].checkbox(processo, key=f"proc_{trabalho['Grupo']}_{processo}"):
-                    processos_selecionados.append(processo)
-
-            # Se nenhum foi selecionado, considerar "Somente Corte"
-            if not processos_selecionados:
-                processos_final = []
-            else:
-                processos_final = processos_selecionados
-
-            for item in trabalho["Detalhes"]:
+            for item in trabalho["detalhes"]:
                 with st.container(border=True):
                     col1, col2 = st.columns([2, 2])
 
                     with col1:
-                        st.markdown(f"**Programador:** {item['Programador']}")
-                        st.markdown(f"**CNC:** {item['CNC']}")
-                        st.markdown(f"**Qtd Chapas:** {item['Qtd Chapas']}")
+                        st.markdown(f"**Programador:** {item.get('programador', 'DESCONHECIDO')}")
+                        st.markdown(f"**CNC:** {item.get('cnc', 'DESCONHECIDO').replace('.pdf', '')}")
+                        st.markdown(f"**Qtd Chapas:** {item.get('qtd_chapas', 'DESCONHECIDO')}")
+                        st.markdown(f"**Tempo Total:** {item.get('tempo_total', 'DESCONHECIDO')}")
 
-                        # Aqui começa o código para editar o tempo
-                        tempo_key = f"tempo_edit_{trabalho['Grupo']}_{item['CNC']}"
-                        editar_key = f"editar_tempo_{trabalho['Grupo']}_{item['CNC']}"
-
-                        st.markdown(f"**Tempo Total:** {item['Tempo Total']}")
+                        tempo_key = f"tempo_edit_{trabalho['grupo']}_{item['cnc']}"
+                        editar_key = f"editar_tempo_{trabalho['grupo']}_{item['cnc']}"
 
                         if st.button("Editar Tempo", key=editar_key):
                             st.session_state[tempo_key] = True
 
                         if st.session_state.get(tempo_key, False):
                             col_h, col_m, col_s = st.columns(3)
-
-                            horas = col_h.number_input("Horas", min_value=0, value=0, key=f"h_{trabalho['Grupo']}_{item['CNC']}")
-                            minutos = col_m.number_input("Min", min_value=0, max_value=59, value=0, key=f"m_{trabalho['Grupo']}_{item['CNC']}")
-                            segundos = col_s.number_input("Seg", min_value=0, max_value=59, value=0, key=f"s_{trabalho['Grupo']}_{item['CNC']}")
+                            horas = col_h.number_input("Horas", min_value=0, value=0, key=f"h_{trabalho['grupo']}_{item['cnc']}")
+                            minutos = col_m.number_input("Min", min_value=0, max_value=59, value=0, key=f"m_{trabalho['grupo']}_{item['cnc']}")
+                            segundos = col_s.number_input("Seg", min_value=0, max_value=59, value=0, key=f"s_{trabalho['grupo']}_{item['cnc']}")
                             tempo_editado = f"{int(horas):02d}:{int(minutos):02d}:{int(segundos):02d}"
 
-                            if st.button("Salvar", key=f"salvar_{item['CNC']}"):
-                                item['Tempo Total'] = tempo_editado
+                            if st.button("Salvar", key=f"salvar_{item['cnc']}"):
+                                atualizar_trabalho_pendente(
+                                    cnc=item['cnc'],
+                                    grupo=trabalho['grupo'],
+                                    tempo_total=tempo_editado
+                                )
+                                st.success("Tempo atualizado com sucesso!")
                                 st.session_state[tempo_key] = False
-
-                                linhas = []
-                                for detalhe in trabalho["Detalhes"]:
-                                    # Garantir que "Caminho" não esteja vazio
-                                    caminho = detalhe.get('Caminho')
-                                    detalhe['Caminho'] = caminho or "Caminho desconhecido"
-
-                                    linhas.append(f"Programador: {detalhe['Programador']}")
-                                    linhas.append(f"CNC: {detalhe['CNC']}")
-                                    linhas.append(f"Qtd Chapas: {detalhe['Qtd Chapas']}")
-                                    linhas.append(f"Tempo Total: {detalhe['Tempo Total']}")
-                                    linhas.append(f"Caminho: {detalhe['Caminho']}")
-                                    linhas.append("")
-
-                                # Envia para o Cloudinary
-                                conteudo = "\n".join(linhas)
-                                nome_arquivo = f"{trabalho['Grupo']}.txt"
-                                upload_txt_to_supabase(nome_arquivo, conteudo, pasta="trabalhos_pendentes")
+                                st.rerun()
 
                     with col2:
-                        # Exibindo a imagem do PDF sem salvar localmente
-                        caminho_pdf = item.get("Caminho")
+                        caminho_pdf = item.get("caminho")
                         if caminho_pdf:
-                            st.image(caminho_pdf, caption=f"CNC {item['CNC']}", use_container_width=True)
+                            st.image(caminho_pdf, caption=f"CNC {item['cnc']}", use_container_width=True)
                         else:
                             st.warning("Pré-visualização indisponível.")
 
             col1, col2 = st.columns(2)
             with col1:
-                if st.button("✅ Autorizar", key=f"auth_{trabalho['Grupo']}"):
-                    # Captura as escolhas do usuário
+                if st.button("✅ Autorizar", key=f"auth_{trabalho['grupo']}"):
                     data_str = str(data_processo)
-                    processos_str = ", ".join(processos_final) if processos_final else "Somente Corte"
+                    processos_final = processos_selecionados or []
 
-                    # Prepara as informações complementares
-                    nome_arquivo = f"{trabalho['Grupo']}.txt"
+                    for item in trabalho["detalhes"]:
+                        atualizar_trabalho_pendente(
+                            cnc=item['cnc'],
+                            grupo=trabalho['grupo'],
+                            tempo_total=item['tempo_total'],
+                            data_prevista=data_str,
+                            processos=processos_final,
+                            autorizado=True
+                        )
 
-                    # Primeiro, recupera o conteúdo atual da pasta aguardando_aprovacao
-                    conteudo_atual = baixar_txt_conteudo(nome_arquivo, pasta="aguardando_aprovacao")
-
-                    # Complementa com as informações adicionais
-                    conteudo_complementado = (
-                        conteudo_atual + "\n"
-                        + "===== INFORMAÇÕES ADICIONAIS =====\n"
-                        + f"Data prevista: {data_str}\n"
-                        + f"Processos: {processos_str}\n"
-                    )
-
-                    # exclui de trbalhos pendentes para caso de substituiçaõ
-                    deletar_arquivo_supabase(f"trabalhos_pendentes/{nome_arquivo}")
-
-                    # Envia para a pasta TRABALHOS_PENDENTES
-                    upload_txt_to_supabase(nome_arquivo, conteudo_complementado, pasta="trabalhos_pendentes")
-
-                    # Agora sim remove da aguardando_aprovacao
-                    deletar_arquivo_supabase(f"aguardando_aprovacao/{nome_arquivo}")
-
-                    st.success(f"Trabalho do grupo {trabalho['Grupo']} autorizado.")
+                    st.success(f"Trabalho do grupo {trabalho['grupo']} autorizado.")
                     st.rerun()
 
             with col2:
-                if st.button("❌ Rejeitar", key=f"rej_{trabalho['Grupo']}"):
-                    # Remove do Cloudinary da pasta aguardando_aprovacao
-                    deletar_arquivo_supabase(f"aguardando_aprovacao/{trabalho['Grupo']}.txt")
-                    st.warning(f"Trabalho do grupo {trabalho['Grupo']} rejeitado.")
+                if st.button("❌ Rejeitar", key=f"rej_{trabalho['grupo']}"):
+                    excluir_trabalhos_grupo(trabalho['grupo'])
+                    st.warning(f"Trabalho do grupo {trabalho['grupo']} rejeitado.")
                     st.rerun()

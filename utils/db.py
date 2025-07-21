@@ -1,38 +1,20 @@
 from utils.supabase import supabase
 from datetime import datetime
 
-from utils.supabase import upload_txt_to_supabase, baixar_txt_conteudo
-
+def inserir_trabalho_pendente(dados):
+    supabase.table("trabalhos_pendentes").insert(dados).execute()
 
 def adicionar_na_fila(maquina, trabalho):
     supabase.table("fila_maquinas").insert({
         "maquina": maquina,
-        "proposta": trabalho["Proposta"],
-        "cnc": trabalho["CNC"],
-        "material": trabalho["Material"],
-        "espessura": trabalho["Espessura"],
-        "quantidade": trabalho["Quantidade"],
-        "tempo_total": trabalho["Tempo Total"],
-        "caminho": trabalho.get("Caminho", "")
+        "proposta": trabalho["proposta"],
+        "cnc": trabalho["cnc"],
+        "material": trabalho["material"],
+        "espessura": trabalho["espessura"],
+        "quantidade": trabalho["quantidade"],
+        "tempo_total": trabalho["tempo_total"],
+        "caminho": trabalho.get("caminho", "")
     }).execute()
-
-
-def registrar_trabalho_enviado(grupo, proposta, cnc, material, espessura,
-                               quantidade, tempo_total, programador,
-                               data_prevista=None, processos=None):
-    supabase.table("trabalhos_enviados").upsert({
-        "grupo": grupo,
-        "proposta": proposta,
-        "cnc": cnc,
-        "material": material,
-        "espessura": espessura,
-        "quantidade": quantidade,
-        "tempo_total": tempo_total,
-        "programador": programador,
-        "data_prevista": data_prevista,
-        "processos": processos
-    }).execute()
-
 
 def obter_fila(maquina):
     res = supabase.table("fila_maquinas").select("*").eq("maquina", maquina).execute()
@@ -82,11 +64,6 @@ def excluir_da_fila(maquina, id_trabalho):
 def excluir_do_corte(maquina):
     supabase.table("corte_atual").delete().eq("maquina", maquina).execute()
 
-
-def excluir_pendente(grupo):
-    # Nada a fazer na base supabase, pois arquivo .txt é quem representa pendência
-    pass
-
 def retornar_para_pendentes(maquina):
     atual = obter_corte_atual(maquina)
     if not atual:
@@ -94,23 +71,30 @@ def retornar_para_pendentes(maquina):
 
     grupo = f"{atual['proposta']}-{int(atual['espessura'] * 100):04}-{atual['material']}"
 
-    res = supabase.table("trabalhos_enviados").select("programador", "data_prevista", "processos").eq("grupo", grupo).eq("cnc", atual["cnc"]).execute()
+    res = supabase.table("trabalhos_pendentes")\
+        .select("programador", "data_prevista", "processos")\
+        .eq("grupo", grupo)\
+        .eq("cnc", atual["cnc"]).execute()
+
     dados = res.data[0] if res.data else {}
 
-    conteudo = f"""Programador: {dados.get('programador', 'DESCONHECIDO')}
-CNC: {atual['cnc']}
-Qtd Chapas: {atual['quantidade']}
-Tempo Total: {atual['tempo_total']}
-Caminho: CNC/{atual['cnc']}.pdf
+    trabalho = {
+        "grupo": grupo,
+        "proposta": atual["proposta"],
+        "cnc": atual["cnc"],
+        "material": atual["material"],
+        "espessura": atual["espessura"],
+        "quantidade": atual["quantidade"],
+        "tempo_total": atual["tempo_total"],
+        "programador": dados.get("programador", "DESCONHECIDO"),
+        "data_prevista": dados.get("data_prevista", str(datetime.today().date())),
+        "processos": dados.get("processos", "Corte Retornado"),
+        "autorizado": False,
+        "caminho": atual.get("caminho", f"CNC/{atual['cnc']}.pdf")
+    }
 
-===== INFORMAÇÕES ADICIONAIS =====
-Data prevista: {dados.get('data_prevista', str(datetime.today().date()))}
-Processos: {dados.get('processos', 'Corte Retornado')}
-"""
-
-    upload_txt_to_supabase(f"{grupo}.txt", conteudo, pasta="trabalhos_pendentes")
+    inserir_trabalho_pendente(trabalho)
     excluir_do_corte(maquina)
-
 
 def retornar_item_da_fila_para_pendentes(id_trabalho):
     res = supabase.table("fila_maquinas").select("*").eq("id", id_trabalho).execute()
@@ -121,44 +105,54 @@ def retornar_item_da_fila_para_pendentes(id_trabalho):
     grupo = f"{item['proposta']}-{int(item['espessura'] * 100):04}-{item['material']}"
     cnc_alvo = item["cnc"]
 
-    # Busca metadados do CNC
-    dados_res = supabase.table("trabalhos_enviados").select("programador", "data_prevista", "processos").eq("grupo", grupo).eq("cnc", cnc_alvo).execute()
+    dados_res = supabase.table("trabalhos_pendentes")\
+        .select("programador", "data_prevista", "processos")\
+        .eq("grupo", grupo)\
+        .eq("cnc", cnc_alvo).execute()
+
     dados = dados_res.data[0] if dados_res.data else {}
 
-    # Lê o conteúdo atual do .txt
-    try:
-        conteudo_atual = baixar_txt_conteudo(f"{grupo}.txt", pasta="trabalhos_pendentes")
-    except Exception:
-        conteudo_atual = ""
+    novo_trabalho = {
+        "grupo": grupo,
+        "proposta": item["proposta"],
+        "cnc": item["cnc"],
+        "material": item["material"],
+        "espessura": item["espessura"],
+        "quantidade": item["quantidade"],
+        "tempo_total": item["tempo_total"],
+        "programador": dados.get("programador", "DESCONHECIDO"),
+        "data_prevista": dados.get("data_prevista", str(datetime.today().date())),
+        "processos": dados.get("processos", "Corte Retornado"),
+        "autorizado": False,
+        "caminho": item.get("caminho", f"CNC/{item['cnc']}.pdf")
+    }
 
-    caminho_img = item.get("caminho", f"CNC/{item['cnc']}")
-
-    novo_bloco = f"""Programador: {dados.get('programador', 'DESCONHECIDO')}
-CNC: {item['cnc']}
-Qtd Chapas: {item['quantidade']}
-Tempo Total: {item['tempo_total']}
-Caminho: {caminho_img}"""
-
-    # Separar conteúdo principal e adicionais
-    if "===== INFORMAÇÕES ADICIONAIS =====" in conteudo_atual:
-        partes = conteudo_atual.split("===== INFORMAÇÕES ADICIONAIS =====")
-        conteudo_principal = partes[0].strip()
-        conteudo_adicional = partes[1].strip()
-    else:
-        conteudo_principal = conteudo_atual.strip()
-        conteudo_adicional = f"Data prevista: {dados.get('data_prevista', str(datetime.today().date()))}\nProcessos: {dados.get('processos', 'Corte Retornado')}"
-
-    # Atualiza os blocos mantendo apenas os CNCs ainda válidos + o retornado
-    blocos_existentes = [b.strip() for b in conteudo_principal.split("\n\n") if b.strip()]
-    blocos_filtrados = [b for b in blocos_existentes if f"CNC: {cnc_alvo}" not in b]
-
-    # Substitui por novo bloco do CNC retornado
-    novo_conteudo_principal = "\n\n".join(blocos_filtrados + [novo_bloco])
-
-    novo_conteudo_final = f"{novo_conteudo_principal}\n\n===== INFORMAÇÕES ADICIONAIS =====\n{conteudo_adicional}".strip()
-
-    upload_txt_to_supabase(f"{grupo}.txt", novo_conteudo_final, pasta="trabalhos_pendentes")
+    inserir_trabalho_pendente(novo_trabalho)
     excluir_da_fila(item["maquina"], id_trabalho)
 
 def atualizar_quantidade(maquina, nova_quantidade):
     supabase.table("corte_atual").update({"quantidade": nova_quantidade}).eq("maquina", maquina).execute()
+
+
+def atualizar_trabalho_pendente(cnc, grupo, tempo_total, data_prevista=None, processos=None, autorizado=False):
+    update_data = {
+        "tempo_total": tempo_total,
+        "data_prevista": data_prevista,
+        "processos": processos,
+        "autorizado": autorizado
+    }
+
+    # Remove campos nulos para evitar sobrescrita
+    update_data = {k: v for k, v in update_data.items() if v is not None}
+
+    supabase.table("trabalhos_pendentes")\
+        .update(update_data)\
+        .eq("grupo", grupo)\
+        .eq("cnc", cnc)\
+        .execute()
+
+def excluir_trabalhos_grupo(grupo: str):
+    supabase.table("trabalhos_pendentes")\
+        .delete()\
+        .eq("grupo", grupo)\
+        .execute()
