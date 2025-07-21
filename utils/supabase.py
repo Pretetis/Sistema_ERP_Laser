@@ -19,12 +19,15 @@ BUCKET_NAME = "erpmicrons"
 def upload_txt_to_supabase(nome_arquivo: str, conteudo: str, pasta: str = "aguardando_aprovacao") -> str:
     caminho_bucket = f"{pasta}/{nome_arquivo}"
 
+    # ❗ Força a exclusão do arquivo, se já existir
+    deletar_arquivo_supabase(caminho_bucket)
+
     # Cria arquivo temporário
     with tempfile.NamedTemporaryFile(delete=False, suffix=".txt", mode="w", encoding="utf-8") as tmp_file:
         tmp_file.write(conteudo)
         caminho_temp = Path(tmp_file.name)
 
-    # Faz upload pelo caminho do arquivo físico
+    # Upload após a exclusão
     supabase.storage.from_(BUCKET_NAME).upload(
         caminho_bucket,
         str(caminho_temp),

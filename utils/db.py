@@ -119,34 +119,46 @@ def retornar_item_da_fila_para_pendentes(id_trabalho):
 
     item = res.data[0]
     grupo = f"{item['proposta']}-{int(item['espessura'] * 100):04}-{item['material']}"
+    cnc_alvo = item["cnc"]
 
-    dados_res = supabase.table("trabalhos_enviados").select("programador", "data_prevista", "processos").eq("grupo", grupo).eq("cnc", item["cnc"]).execute()
+    # Busca metadados do CNC
+    dados_res = supabase.table("trabalhos_enviados").select("programador", "data_prevista", "processos").eq("grupo", grupo).eq("cnc", cnc_alvo).execute()
     dados = dados_res.data[0] if dados_res.data else {}
 
+    # Lê o conteúdo atual do .txt
     try:
         conteudo_atual = baixar_txt_conteudo(f"{grupo}.txt", pasta="trabalhos_pendentes")
     except Exception:
         conteudo_atual = ""
 
     caminho_img = item.get("caminho", f"CNC/{item['cnc']}")
+
     novo_bloco = f"""Programador: {dados.get('programador', 'DESCONHECIDO')}
 CNC: {item['cnc']}
 Qtd Chapas: {item['quantidade']}
 Tempo Total: {item['tempo_total']}
 Caminho: {caminho_img}"""
 
+    # Separar conteúdo principal e adicionais
     if "===== INFORMAÇÕES ADICIONAIS =====" in conteudo_atual:
         partes = conteudo_atual.split("===== INFORMAÇÕES ADICIONAIS =====")
-        principal = partes[0].strip()
-        adicionais = partes[1].strip()
-        novo_conteudo = f"{principal}\n\n{novo_bloco}\n\n===== INFORMAÇÕES ADICIONAIS =====\n{adicionais}"
+        conteudo_principal = partes[0].strip()
+        conteudo_adicional = partes[1].strip()
     else:
-        novo_conteudo = f"{conteudo_atual.strip()}\n\n{novo_bloco}"
-        novo_conteudo += f"\n\n===== INFORMAÇÕES ADICIONAIS =====\nData prevista: {dados.get('data_prevista', str(datetime.today().date()))}\nProcessos: {dados.get('processos', 'Corte Retornado')}"
+        conteudo_principal = conteudo_atual.strip()
+        conteudo_adicional = f"Data prevista: {dados.get('data_prevista', str(datetime.today().date()))}\nProcessos: {dados.get('processos', 'Corte Retornado')}"
 
-    upload_txt_to_supabase(f"{grupo}.txt", novo_conteudo, pasta="trabalhos_pendentes")
+    # Atualiza os blocos mantendo apenas os CNCs ainda válidos + o retornado
+    blocos_existentes = [b.strip() for b in conteudo_principal.split("\n\n") if b.strip()]
+    blocos_filtrados = [b for b in blocos_existentes if f"CNC: {cnc_alvo}" not in b]
+
+    # Substitui por novo bloco do CNC retornado
+    novo_conteudo_principal = "\n\n".join(blocos_filtrados + [novo_bloco])
+
+    novo_conteudo_final = f"{novo_conteudo_principal}\n\n===== INFORMAÇÕES ADICIONAIS =====\n{conteudo_adicional}".strip()
+
+    upload_txt_to_supabase(f"{grupo}.txt", novo_conteudo_final, pasta="trabalhos_pendentes")
     excluir_da_fila(item["maquina"], id_trabalho)
-
 
 def atualizar_quantidade(maquina, nova_quantidade):
     supabase.table("corte_atual").update({"quantidade": nova_quantidade}).eq("maquina", maquina).execute()
