@@ -1,262 +1,152 @@
-import sqlite3
-from pathlib import Path
+from utils.supabase import supabase
 from datetime import datetime
 
-from utils.supabase import upload_txt_to_supabase 
-
-DB_PATH = Path("estado_maquinas.db")
-
-def criar_banco():
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS fila_maquinas (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            maquina TEXT,
-            proposta TEXT,
-            cnc TEXT,
-            material TEXT,
-            espessura REAL,
-            quantidade INTEGER,
-            tempo_total TEXT,
-            caminho TEXT
-        )
-    """)
-
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS corte_atual (
-            maquina TEXT PRIMARY KEY,
-            proposta TEXT,
-            cnc TEXT,
-            material TEXT,
-            espessura REAL,
-            quantidade INTEGER,
-            tempo_total TEXT
-        )
-    """)
-
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS trabalhos_enviados (
-            grupo TEXT,
-            proposta TEXT,
-            cnc TEXT,
-            material TEXT,
-            espessura REAL,
-            quantidade INTEGER,
-            tempo_total TEXT,
-            programador TEXT,
-            data_prevista TEXT,
-            processos TEXT,
-            PRIMARY KEY (grupo, cnc)
-        )
-    """)
-
-    conn.commit()
-    conn.close()
+from utils.supabase import upload_txt_to_supabase, baixar_txt_conteudo
 
 
 def adicionar_na_fila(maquina, trabalho):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("""
-        INSERT INTO fila_maquinas (maquina, proposta, cnc, material, espessura, quantidade, tempo_total, caminho)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    """, (maquina, trabalho["Proposta"], trabalho["CNC"], trabalho["Material"],
-          trabalho["Espessura"], trabalho["Quantidade"], trabalho["Tempo Total"], trabalho["Caminho"]))
-    conn.commit()
-    conn.close()
+    supabase.table("fila_maquinas").insert({
+        "maquina": maquina,
+        "proposta": trabalho["Proposta"],
+        "cnc": trabalho["CNC"],
+        "material": trabalho["Material"],
+        "espessura": trabalho["Espessura"],
+        "quantidade": trabalho["Quantidade"],
+        "tempo_total": trabalho["Tempo Total"],
+        "caminho": trabalho.get("Caminho", "")
+    }).execute()
 
 
 def registrar_trabalho_enviado(grupo, proposta, cnc, material, espessura,
                                quantidade, tempo_total, programador,
                                data_prevista=None, processos=None):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("""
-        INSERT OR REPLACE INTO trabalhos_enviados
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (
-        grupo, proposta, cnc, material, espessura, quantidade,
-        tempo_total, programador, data_prevista, processos
-    ))
-    conn.commit()
-    conn.close()
+    supabase.table("trabalhos_enviados").upsert({
+        "grupo": grupo,
+        "proposta": proposta,
+        "cnc": cnc,
+        "material": material,
+        "espessura": espessura,
+        "quantidade": quantidade,
+        "tempo_total": tempo_total,
+        "programador": programador,
+        "data_prevista": data_prevista,
+        "processos": processos
+    }).execute()
 
 
 def obter_fila(maquina):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM fila_maquinas WHERE maquina = ?", (maquina,))
-    resultados = cursor.fetchall()
-    conn.close()
-    return resultados
-
-
-def iniciar_corte(maquina, id_fila):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM fila_maquinas WHERE id = ?", (id_fila,))
-    item = cursor.fetchone()
-
-    if item:
-        cursor.execute("DELETE FROM fila_maquinas WHERE id = ?", (id_fila,))
-        cursor.execute("""
-            INSERT OR REPLACE INTO corte_atual
-            (maquina, proposta, cnc, material, espessura, quantidade, tempo_total)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, item[1:])  # ignora o ID
-
-    conn.commit()
-    conn.close()
-
-
-def finalizar_corte(maquina):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT quantidade FROM corte_atual WHERE maquina = ?", (maquina,))
-    row = cursor.fetchone()
-
-    if not row:
-        conn.close()
-        return
-
-    quantidade = row[0]
-
-    if quantidade > 1:
-        cursor.execute("UPDATE corte_atual SET quantidade = ? WHERE maquina = ?", (quantidade - 1, maquina))
-    else:
-        cursor.execute("DELETE FROM corte_atual WHERE maquina = ?", (maquina,))
-
-    conn.commit()
-    conn.close()
+    res = supabase.table("fila_maquinas").select("*").eq("maquina", maquina).execute()
+    return res.data if res.data else []
 
 
 def obter_corte_atual(maquina):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM corte_atual WHERE maquina = ?", (maquina,))
-    corte = cursor.fetchone()
-    conn.close()
-    return corte
+    res = supabase.table("corte_atual").select("*").eq("maquina", maquina).execute()
+    return res.data[0] if res.data else None
 
 
-def atualizar_quantidade(id_trabalho: int, nova_quantidade: int):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("""
-        UPDATE corte_atual
-        SET quantidade = ?
-        WHERE rowid = ?
-    """, (nova_quantidade, id_trabalho))
-    conn.commit()
-    conn.close()
-
-
-def excluir_da_fila(maquina: str, id_trabalho: int):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM fila_maquinas WHERE maquina = ? AND id = ?", (maquina, id_trabalho))
-    conn.commit()
-    conn.close()
-
-
-def excluir_do_corte(maquina: str):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM corte_atual WHERE maquina = ?", (maquina,))
-    conn.commit()
-    conn.close()
-
-
-def excluir_pendente(grupo: str):
-    # Nenhuma ação necessária, pois o TXT está apenas no Cloudinary
-    pass
-
-
-def retornar_para_pendentes(maquina: str):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    corte = obter_corte_atual(maquina)
-    if not corte:
+def iniciar_corte(maquina, id_fila):
+    fila = supabase.table("fila_maquinas").select("*").eq("id", id_fila).execute()
+    if not fila.data:
         return
 
-    _, proposta, cnc, material, espessura, quantidade, tempo_total = corte
-    grupo = f"{proposta}-{int(espessura * 100):04}-{material}"
+    item = fila.data[0]
 
-    cursor.execute("""
-        SELECT programador, data_prevista, processos
-        FROM trabalhos_enviados
-        WHERE grupo = ? AND cnc = ?
-    """, (grupo, cnc))
-    resultado = cursor.fetchone()
-    conn.close()
+    supabase.table("fila_maquinas").delete().eq("id", id_fila).execute()
 
-    programador = resultado[0] if resultado else "DESCONHECIDO"
-    data_prevista = resultado[1] if resultado else str(datetime.today().date())
-    processos = resultado[2] if resultado else "Corte Retornado"
+    supabase.table("corte_atual").upsert({
+        "maquina": item["maquina"],
+        "proposta": item["proposta"],
+        "cnc": item["cnc"],
+        "material": item["material"],
+        "espessura": item["espessura"],
+        "quantidade": item["quantidade"],
+        "tempo_total": item["tempo_total"]
+    }).execute()
 
-    conteudo = f"""Programador: {programador}
-CNC: {cnc}
-Qtd Chapas: {quantidade}
-Tempo Total: {tempo_total}
-Caminho: CNC/{cnc}.pdf
+
+def finalizar_corte(maquina):
+    atual = obter_corte_atual(maquina)
+    if not atual:
+        return
+
+    if atual["quantidade"] > 1:
+        supabase.table("corte_atual").update({"quantidade": atual["quantidade"] - 1}).eq("maquina", maquina).execute()
+    else:
+        supabase.table("corte_atual").delete().eq("maquina", maquina).execute()
+
+
+def excluir_da_fila(maquina, id_trabalho):
+    supabase.table("fila_maquinas").delete().eq("maquina", maquina).eq("id", id_trabalho).execute()
+
+
+def excluir_do_corte(maquina):
+    supabase.table("corte_atual").delete().eq("maquina", maquina).execute()
+
+
+def excluir_pendente(grupo):
+    # Nada a fazer na base supabase, pois arquivo .txt é quem representa pendência
+    pass
+
+def retornar_para_pendentes(maquina):
+    atual = obter_corte_atual(maquina)
+    if not atual:
+        return
+
+    grupo = f"{atual['proposta']}-{int(atual['espessura'] * 100):04}-{atual['material']}"
+
+    res = supabase.table("trabalhos_enviados").select("programador", "data_prevista", "processos").eq("grupo", grupo).eq("cnc", atual["cnc"]).execute()
+    dados = res.data[0] if res.data else {}
+
+    conteudo = f"""Programador: {dados.get('programador', 'DESCONHECIDO')}
+CNC: {atual['cnc']}
+Qtd Chapas: {atual['quantidade']}
+Tempo Total: {atual['tempo_total']}
+Caminho: CNC/{atual['cnc']}.pdf
 
 ===== INFORMAÇÕES ADICIONAIS =====
-Data prevista: {data_prevista}
-Processos: {processos}
+Data prevista: {dados.get('data_prevista', str(datetime.today().date()))}
+Processos: {dados.get('processos', 'Corte Retornado')}
 """
 
-    nome_arquivo = f"trabalhos_pendentes-{grupo}-{cnc}.txt"
-    upload_txt_to_supabase(nome_arquivo, conteudo)  # ✅ Substituído
-
+    upload_txt_to_supabase(f"{grupo}.txt", conteudo, pasta="trabalhos_pendentes")
     excluir_do_corte(maquina)
 
 
-def retornar_item_da_fila_para_pendentes(id_trabalho: int):
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT id, maquina, proposta, cnc, material, espessura,
-               quantidade, tempo_total
-        FROM fila_maquinas
-        WHERE id = ?
-    """, (id_trabalho,))
-    row = cursor.fetchone()
-    conn.close()
-
-    if not row:
+def retornar_item_da_fila_para_pendentes(id_trabalho):
+    res = supabase.table("fila_maquinas").select("*").eq("id", id_trabalho).execute()
+    if not res.data:
         return
 
-    _, _, proposta, cnc, material, espessura, quantidade, tempo_total = row
-    grupo = f"{proposta}-{int(espessura * 100):04}-{material}"
+    item = res.data[0]
+    grupo = f"{item['proposta']}-{int(item['espessura'] * 100):04}-{item['material']}"
 
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT programador, data_prevista, processos
-        FROM trabalhos_enviados
-        WHERE grupo = ? AND cnc = ?
-    """, (grupo, cnc))
-    res = cursor.fetchone()
-    conn.close()
+    dados_res = supabase.table("trabalhos_enviados").select("programador", "data_prevista", "processos").eq("grupo", grupo).eq("cnc", item["cnc"]).execute()
+    dados = dados_res.data[0] if dados_res.data else {}
 
-    programador = res[0] if res else "DESCONHECIDO"
-    data_prevista = res[1] if res else str(datetime.today().date())
-    processos = res[2] if res else "Corte Retornado"
+    try:
+        conteudo_atual = baixar_txt_conteudo(f"{grupo}.txt", pasta="trabalhos_pendentes")
+    except Exception:
+        conteudo_atual = ""
 
-    conteudo = f"""Programador: {programador}
-CNC: {cnc}
-Qtd Chapas: {quantidade}
-Tempo Total: {tempo_total}
-Caminho: CNC/{cnc}.pdf
+    caminho_img = item.get("caminho", f"CNC/{item['cnc']}")
+    novo_bloco = f"""Programador: {dados.get('programador', 'DESCONHECIDO')}
+CNC: {item['cnc']}
+Qtd Chapas: {item['quantidade']}
+Tempo Total: {item['tempo_total']}
+Caminho: {caminho_img}"""
 
-===== INFORMAÇÕES ADICIONAIS =====
-Data prevista: {data_prevista}
-Processos: {processos}
-"""
+    if "===== INFORMAÇÕES ADICIONAIS =====" in conteudo_atual:
+        partes = conteudo_atual.split("===== INFORMAÇÕES ADICIONAIS =====")
+        principal = partes[0].strip()
+        adicionais = partes[1].strip()
+        novo_conteudo = f"{principal}\n\n{novo_bloco}\n\n===== INFORMAÇÕES ADICIONAIS =====\n{adicionais}"
+    else:
+        novo_conteudo = f"{conteudo_atual.strip()}\n\n{novo_bloco}"
+        novo_conteudo += f"\n\n===== INFORMAÇÕES ADICIONAIS =====\nData prevista: {dados.get('data_prevista', str(datetime.today().date()))}\nProcessos: {dados.get('processos', 'Corte Retornado')}"
 
-    nome_arquivo = f"trabalhos_pendentes-{grupo}-{cnc}.txt"
-    upload_txt_to_supabase(nome_arquivo, conteudo)  # ✅ Substituído
+    upload_txt_to_supabase(f"{grupo}.txt", novo_conteudo, pasta="trabalhos_pendentes")
+    excluir_da_fila(item["maquina"], id_trabalho)
 
-    excluir_da_fila("", id_trabalho)
+
+def atualizar_quantidade(maquina, nova_quantidade):
+    supabase.table("corte_atual").update({"quantidade": nova_quantidade}).eq("maquina", maquina).execute()

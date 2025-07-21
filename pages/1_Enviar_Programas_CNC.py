@@ -3,8 +3,8 @@ import sys
 from pathlib import Path
 from streamlit_autorefresh import st_autorefresh
 
-from utils.supabase import upload_txt_to_supabase, deletar_arquivo_supabase, baixar_txt_conteudo
-from utils.extracao import extrair_dados_por_posicao
+from utils.supabase import upload_txt_to_supabase, deletar_arquivo_supabase, baixar_txt_conteudo, upload_imagem_to_supabase
+from utils.extracao import extrair_dados_por_posicao, gerar_preview_pdf
 from utils.Junta_Trabalhos import carregar_trabalhos
 from utils.navegacao import barra_navegacao
 
@@ -108,8 +108,8 @@ else:
                         st.markdown(f"**Qtd Chapas:** {item['Qtd Chapas']}")
 
                         # Aqui começa o código para editar o tempo
-                        tempo_key = f"tempo_edit_{item['CNC']}"  # chave única
-                        editar_key = f"editar_tempo_{item['CNC']}"
+                        tempo_key = f"tempo_edit_{trabalho['Grupo']}_{item['CNC']}"
+                        editar_key = f"editar_tempo_{trabalho['Grupo']}_{item['CNC']}"
 
                         st.markdown(f"**Tempo Total:** {item['Tempo Total']}")
 
@@ -119,9 +119,9 @@ else:
                         if st.session_state.get(tempo_key, False):
                             col_h, col_m, col_s = st.columns(3)
 
-                            horas = col_h.number_input("Horas", min_value=0, value=0, key=f"h_{item['CNC']}")
-                            minutos = col_m.number_input("Min", min_value=0, max_value=59, value=0, key=f"m_{item['CNC']}")
-                            segundos = col_s.number_input("Seg", min_value=0, max_value=59, value=0, key=f"s_{item['CNC']}")
+                            horas = col_h.number_input("Horas", min_value=0, value=0, key=f"h_{trabalho['Grupo']}_{item['CNC']}")
+                            minutos = col_m.number_input("Min", min_value=0, max_value=59, value=0, key=f"m_{trabalho['Grupo']}_{item['CNC']}")
+                            segundos = col_s.number_input("Seg", min_value=0, max_value=59, value=0, key=f"s_{trabalho['Grupo']}_{item['CNC']}")
                             tempo_editado = f"{int(horas):02d}:{int(minutos):02d}:{int(segundos):02d}"
 
                             if st.button("Salvar", key=f"salvar_{item['CNC']}"):
@@ -165,7 +165,7 @@ else:
                     nome_arquivo = f"{trabalho['Grupo']}.txt"
 
                     # Primeiro, recupera o conteúdo atual da pasta aguardando_aprovacao
-                    conteudo_atual = baixar_txt_conteudo(nome_arquivo, bucket="aguardando_aprovacao")
+                    conteudo_atual = baixar_txt_conteudo(nome_arquivo, pasta="aguardando_aprovacao")
 
                     # Complementa com as informações adicionais
                     conteudo_complementado = (
@@ -175,11 +175,14 @@ else:
                         + f"Processos: {processos_str}\n"
                     )
 
+                    # exclui de trbalhos pendentes para caso de substituiçaõ
+                    deletar_arquivo_supabase(f"trabalhos_pendentes/{nome_arquivo}")
+
                     # Envia para a pasta TRABALHOS_PENDENTES
                     upload_txt_to_supabase(nome_arquivo, conteudo_complementado, pasta="trabalhos_pendentes")
 
                     # Agora sim remove da aguardando_aprovacao
-                    deletar_arquivo_supabase(nome_arquivo, bucket="aguardando_aprovacao")
+                    deletar_arquivo_supabase(f"aguardando_aprovacao/{nome_arquivo}")
 
                     st.success(f"Trabalho do grupo {trabalho['Grupo']} autorizado.")
                     st.rerun()
@@ -187,6 +190,6 @@ else:
             with col2:
                 if st.button("❌ Rejeitar", key=f"rej_{trabalho['Grupo']}"):
                     # Remove do Cloudinary da pasta aguardando_aprovacao
-                    deletar_arquivo_supabase(f"{trabalho['Grupo']}.txt", bucket="aguardando_aprovacao")
+                    deletar_arquivo_supabase(f"aguardando_aprovacao/{trabalho['Grupo']}.txt")
                     st.warning(f"Trabalho do grupo {trabalho['Grupo']} rejeitado.")
                     st.rerun()

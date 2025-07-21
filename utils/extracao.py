@@ -10,21 +10,16 @@ pasta_saida = Path("Programas_Prontos")
 pasta_saida.mkdir(exist_ok=True)
 
 
-def gerar_preview_pdf(path_pdf: Path) -> str:
-    """Gera uma imagem da primeira página do PDF e faz upload no Supabase."""
-    doc = fitz.open(str(path_pdf))
-    pix = doc[0].get_pixmap(dpi=150)
-    caminho_imagem = path_pdf.with_suffix(".png")
-    pix.save(str(caminho_imagem))
-    
-    # Envia a imagem para o Supabase
-    link_publico = upload_imagem_to_supabase(caminho_imagem, destino=caminho_imagem.name)
+def gerar_preview_pdf(pdf_path: Path, nome_saida: str) -> Path:
+    with pdf_path.open("rb") as f:
+        doc = fitz.open(stream=f.read(), filetype="pdf")
+        page = doc.load_page(0)
+        pix = page.get_pixmap(dpi=150)
 
-    # Remove imagem local após upload (opcional)
-    caminho_imagem.unlink(missing_ok=True)
-
-    return link_publico
-
+    # Salva temporariamente como imagem
+    temp_img_path = Path(tempfile.gettempdir()) / f"{nome_saida}.png"
+    pix.save(temp_img_path)
+    return temp_img_path
 
 def extrair_dados_por_posicao(arquivo_pdf):
     arquivo_pdf.seek(0)
@@ -37,11 +32,12 @@ def extrair_dados_por_posicao(arquivo_pdf):
         tmp_file.write(arquivo_pdf.read())
         caminho_temp = Path(tmp_file.name)
 
-    # Gera preview usando o caminho temporário
-    link_supabase = gerar_preview_pdf(caminho_temp)
+    # Gera preview e envia para o Supabase
+    nome_saida = caminho_temp.stem
+    preview_path = gerar_preview_pdf(caminho_temp, nome_saida)
+    link_supabase = upload_imagem_to_supabase(preview_path, destino="previews")
 
-    # Volta o ponteiro para o início se quiser reutilizar
-    arquivo_pdf.seek(0)
+    arquivo_pdf.seek(0)  # Reposiciona ponteiro se quiser reutilizar
 
     proposta = espessura = material = programador = tempo_total = None
     qtd_chapas = 0
@@ -76,7 +72,6 @@ def extrair_dados_por_posicao(arquivo_pdf):
         }
     else:
         return None
-
 
 # 🔍 Processa PDFs da pasta CNC
 arquivos_pdf = list(pasta_cnc.glob("*.pdf"))
