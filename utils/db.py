@@ -26,7 +26,11 @@ def adicionar_na_fila(maquina, trabalho):
     }).execute()
 
 def obter_fila(maquina):
-    res = supabase.table("fila_maquinas").select("*").eq("maquina", maquina).execute()
+    res = supabase.table("fila_maquinas")\
+        .select("*")\
+        .eq("maquina", maquina)\
+        .order("posicao", desc=False)\
+        .execute()
     return res.data if res.data else []
 
 
@@ -326,3 +330,10 @@ def mostrar_grafico_eventos(maquina):
 
 
     st.plotly_chart(fig, use_container_width=True)
+
+
+def trocar_posicao(id1, pos1, id2, pos2):
+    # Atualiza id1 para pos2
+    supabase.table("fila_maquinas").update({"posicao": pos2}).eq("id", id1).execute()
+    # Atualiza id2 para pos1
+    supabase.table("fila_maquinas").update({"posicao": pos1}).eq("id", id2).execute()

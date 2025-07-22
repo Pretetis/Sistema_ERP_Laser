@@ -1,5 +1,7 @@
 import streamlit as st
 import pandas as pd
+from utils.supabase import supabase
+
 from utils.Junta_Trabalhos import carregar_trabalhos
 from utils.db import (
     adicionar_na_fila, obter_fila, atualizar_trabalho_pendente,
@@ -13,6 +15,8 @@ MAQUINAS = ["LASER 1", "LASER 2", "LASER 3", "LASER 4", "LASER 5", "LASER 6"]
 
 from streamlit_autorefresh import st_autorefresh
 from utils.navegacao import barra_navegacao
+from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
+
 #from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCo
 
 # Atualiza automaticamente a cada 7 segundos
@@ -116,56 +120,60 @@ def abrir_dialogo_interrupcao(maquina):
             st.success("Interrupção registrada.")
             st.rerun()
 
+def trocar_posicao(id1, pos1, id2, pos2):
+    # Troca as posições de dois itens na fila
+    supabase.table("fila_maquinas").update({"posicao": pos2}).eq("id", id1).execute()
+    supabase.table("fila_maquinas").update({"posicao": pos1}).eq("id", id2).execute()
+
 for i, maquina in enumerate(MAQUINAS):
-    with cols[i % 1]:
-        with st.container(border=True):
-            st.markdown(f"## 🔧 {maquina}")
+    with st.container(border=True):
+        st.markdown(f"## 🔧 {maquina}")
 
-            corte = obter_corte_atual(maquina)
-            fila = obter_fila(maquina)
+        corte = obter_corte_atual(maquina)
+        fila = obter_fila(maquina)  # já vem ordenada por 'posicao'
 
-            if corte:
-                st.markdown(
-                    f"**🔹 Corte Atual:** {corte.get('qtd_chapas', 'N/D')} | CNC {corte.get('cnc', 'N/D')} | "
-                    f"{corte.get('material', 'N/D')} | {corte.get('espessura', 'N/D')} mm"
-                )
-                col_fim, col_intr, col_ret, col_pend = st.columns(4)
+        if corte:
+            st.markdown(
+                f"**🔹 Corte Atual:** {corte.get('qtd_chapas', 'N/D')} | CNC {corte.get('cnc', 'N/D')} | "
+                f"{corte.get('material', 'N/D')} | {corte.get('espessura', 'N/D')} mm"
+            )
+            col_fim, col_intr, col_ret, col_pend = st.columns(4)
 
-                with col_fim:
-                    if st.button("✅ Finalizar Corte Atual", key=f"fim_{maquina}"):
-                        finalizar_corte(maquina)
-                        st.success("Corte finalizado")
-                        st.rerun()
+            with col_fim:
+                if st.button("✅ Finalizar Corte Atual", key=f"fim_{maquina}"):
+                    finalizar_corte(maquina)
+                    st.success("Corte finalizado")
+                    st.rerun()
 
-                with col_intr:
-                    if st.button("⏸️ Parar Corte", key=f"parar_{maquina}"):
-                        abrir_dialogo_interrupcao(maquina)
+            with col_intr:
+                if st.button("⏸️ Parar Corte", key=f"parar_{maquina}"):
+                    abrir_dialogo_interrupcao(maquina)
 
-                with col_ret:
-                    if st.button("▶️ Retomar Corte", key=f"retomar_{maquina}"):
-                        retomar_interrupcao(maquina)
-                        st.success("Corte retomado.")
-                        st.rerun()
+            with col_ret:
+                if st.button("▶️ Retomar Corte", key=f"retomar_{maquina}"):
+                    retomar_interrupcao(maquina)
+                    st.success("Corte retomado.")
+                    st.rerun()
 
-                with col_pend:
-                    if st.button("🔁 Retornar para Pendentes", key=f"ret_{maquina}"):
-                        retornar_para_pendentes(maquina)
-                        st.success("Trabalho retornado para pendentes")
-                        st.rerun()
+            with col_pend:
+                if st.button("🔁 Retornar para Pendentes", key=f"ret_{maquina}"):
+                    retornar_para_pendentes(maquina)
+                    st.success("Trabalho retornado para pendentes")
+                    st.rerun()
+        else:
+            st.markdown("_Nenhum corte em andamento_")
 
-            else:
-                st.markdown("_Nenhum corte em andamento_")
+        st.divider()
 
-            st.divider()
+        if fila:
+            aba_visual, aba_ordenacao = st.tabs(["📄 Visualização Completa", "🔃 Ordem de Corte"])
 
-            if fila:
+            with aba_visual:
                 st.markdown("### 📋 Fila de Espera")
 
                 dados_fila = []
-                opcoes = {}
-
                 for item in fila:
-                    item_dict = {
+                    dados_fila.append({
                         "ID": item.get("id"),
                         "Máquina": item.get("maquina"),
                         "Proposta": item.get("proposta"),
@@ -175,27 +183,42 @@ for i, maquina in enumerate(MAQUINAS):
                         "Quantidade": item.get("qtd_chapas"),
                         "Tempo": item.get("tempo_total"),
                         "Caminho": item.get("caminho", ""),
-                        "Local Separado": ""
-                                        }
-                    dados_fila.append(item_dict)
-                    chave_opcao = f"{item_dict['Proposta']} | CNC {item_dict['CNC']}"
-                    opcoes[chave_opcao] = item_dict["ID"]
+                        "Local Separado": item.get("local_separado", "")
+                    })
 
                 df_visual = pd.DataFrame(dados_fila)
 
                 config = {
                     "Caminho": st.column_config.ImageColumn(),
+                    "Local Separado": st.column_config.TextColumn(disabled=False)
                 }
 
-                st.data_editor(
-                    df_visual[["Local Separado", "Proposta", "Material", "Espessura", "CNC", "Quantidade", "Tempo", "Caminho"]],
+                for col in df_visual.columns:
+                    if col not in ["Local Separado", "Caminho"]:
+                        config[col] = st.column_config.TextColumn(disabled=True)
+
+                edited_df = st.data_editor(
+                    df_visual.drop(columns=["ID"]),  # ID só usado internamente
                     column_config=config,
                     hide_index=True,
-                    use_container_width=True
+                    use_container_width=True,
+                    key=f"data_editor_{maquina}"
                 )
 
-                escolha = st.selectbox("Escolha próximo CNC:", list(opcoes.keys()), key=f"escolha_{maquina}")
-                col_iniciar, col_ret, col_excluir_fila = st.columns(3)
+                if st.button(f"💾 Salvar 'Local Separado' - {maquina}"):
+                    for idx, novo_valor in enumerate(edited_df["Local Separado"]):
+                        id_item = dados_fila[idx]["ID"]
+                        supabase.table("fila_maquinas").update({"local_separado": novo_valor}).eq("id", id_item).execute()
+                    st.success("Campos salvos com sucesso.")
+                    st.rerun()
+
+                opcoes = {
+                    f"{item['proposta']} | CNC {item['cnc']}": item['id']
+                    for item in fila
+                }
+
+                escolha = st.selectbox("Escolha o próximo CNC:", list(opcoes.keys()), key=f"escolha_{maquina}")
+                col_iniciar, col_ret = st.columns(2)
 
                 with col_iniciar:
                     if st.button("▶️ Iniciar Corte", key=f"iniciar_{maquina}"):
@@ -203,19 +226,79 @@ for i, maquina in enumerate(MAQUINAS):
                             st.warning("Finalize o corte atual antes de iniciar um novo.")
                         else:
                             iniciar_corte(maquina, opcoes[escolha])
-                            st.success("Corte iniciado")
+                            st.success("Corte iniciado.")
                             st.rerun()
 
                 with col_ret:
                     if st.button("🔁 Retornar CNC para Pendentes", key=f"ret_fila_{maquina}"):
                         retornar_item_da_fila_para_pendentes(opcoes[escolha])
-                        st.success("Item da fila retornado para pendentes")
+                        st.success("Item da fila retornado para pendentes.")
                         st.rerun()
 
-            else:
-                st.markdown("_Fila vazia_")
+                with aba_ordenacao:
+                    st.markdown("### 🔃 Ordem de Corte")
 
-            st.divider()
+                    dados_ordenados = []
+                    for i, item in enumerate(fila):  # supondo que `fila` é uma lista de dicionários
+                        dados_ordenados.append({
+                            "ID": item.get("id"),
+                            "Arrastar": "⇅",  # coluna visual para servir como alça de arrasto
+                            "Proposta": item.get("proposta"),
+                            "CNC": item.get("cnc"),
+                            "Qtd Chapas": item.get("qtd_chapas"),
+                            "Material": item.get("material"),
+                            "Espessura": item.get("espessura"),
+                            "Posicao": item.get("posicao", 0)
+                        })
 
-            mostrar_grafico_eventos(maquina)
-        
+                    df_aggrid = pd.DataFrame(dados_ordenados)
+
+                    # Criar opções da grid
+                    gb = GridOptionsBuilder.from_dataframe(df_aggrid)
+                    gb.configure_grid_options(
+                        rowDragManaged=True,  # controla drag pela posição
+                        animateRows=True
+                    )
+
+                    # Coluna que habilita o drag (precisa estar visível)
+                    gb.configure_column(
+                        "Arrastar",
+                        header_name="↕️",
+                        rowDrag=True,
+                        width=40,
+                        suppressMovable=True
+                    )
+
+                    # Oculta colunas internas, se quiser
+                    gb.configure_column("ID", hide=True)
+                    gb.configure_column("Posicao", hide=True)
+
+                    # Construir opções
+                    grid_options = gb.build()
+
+                    # Exibir tabela com drag-and-drop
+                    response = AgGrid(
+                        df_aggrid,
+                        gridOptions=grid_options,
+                        update_mode=GridUpdateMode.MODEL_CHANGED,
+                        fit_columns_on_grid_load=True,
+                        allow_unsafe_jscode=True,
+                        theme="streamlit",
+                        height=400
+                    )
+
+                    # Botão para salvar nova ordem
+                    if st.button("💾 Salvar Nova Ordem de Corte"):
+                        nova_ordem_df = response["data"].reset_index(drop=True)
+                        for nova_posicao, row in nova_ordem_df.iterrows():
+                            supabase.table("fila_maquinas").update(
+                                {"posicao": nova_posicao}
+                            ).eq("id", row["ID"]).execute()
+                        st.success("Ordem atualizada com sucesso.")
+                        st.rerun()
+
+        else:
+            st.markdown("_Fila vazia_")
+
+        st.divider()
+        mostrar_grafico_eventos(maquina)
