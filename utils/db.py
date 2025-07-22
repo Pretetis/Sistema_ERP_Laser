@@ -1,5 +1,5 @@
 from utils.supabase import supabase
-from datetime import datetime
+from datetime import datetime, timedelta
 
 def inserir_trabalho_pendente(dados):
     supabase.table("trabalhos_pendentes").insert(dados).execute()
@@ -13,7 +13,9 @@ def adicionar_na_fila(maquina, trabalho):
         "espessura": trabalho["espessura"],
         "qtd_chapas": int(trabalho["qtd_chapas"]),
         "tempo_total": trabalho["tempo_total"],
-        "caminho": trabalho.get("caminho", "")
+        "caminho": trabalho.get("caminho", ""),
+        "programador": trabalho["programador"],
+        "processos": normalizar_processos(trabalho.get("processos"))
     }).execute()
 
 def obter_fila(maquina):
@@ -41,21 +43,46 @@ def iniciar_corte(maquina, id_fila):
         "cnc": item["cnc"],
         "material": item["material"],
         "espessura": item["espessura"],
-        "qtd_chapas": item["qtd_chapas"],
-        "tempo_total": item["tempo_total"]
+        "qtd_chapas": int(item["qtd_chapas"]),
+        "tempo_total": item["tempo_total"],
+        "caminho": item["caminho"],
+        "programador": item["programador"],
+        "processos": item.get("processos")
     }).execute()
 
+    registrar_evento(maquina, "iniciado", item["proposta"], item["cnc"])
 
 def finalizar_corte(maquina):
     atual = obter_corte_atual(maquina)
     if not atual:
         return
 
-    if atual["qtd_chapas"] > 1:
-        supabase.table("corte_atual").update({"qtd_chapas": atual["qtd_chapas"] - 1}).eq("maquina", maquina).execute()
-    else:
-        supabase.table("corte_atual").delete().eq("maquina", maquina).execute()
+    qtd_chapas = atual["qtd_chapas"]
+    if qtd_chapas <= 0:
+        excluir_do_corte(maquina)
+        return
 
+    # Tempo total atual em string "HH:MM:SS" => timedelta
+    tempo_total_str = atual["tempo_total"]
+    h, m, s = map(int, tempo_total_str.split(":"))
+    tempo_total = timedelta(hours=h, minutes=m, seconds=s)
+
+    # Recalcula tempo restante proporcionalmente
+    tempo_por_chapa = tempo_total / qtd_chapas
+    novo_qtd_chapas = qtd_chapas - 1
+
+    if novo_qtd_chapas > 0:
+        novo_tempo = tempo_por_chapa * novo_qtd_chapas
+        novo_tempo_str = timedelta_to_hms_string(novo_tempo)
+
+        supabase.table("corte_atual").update({
+            "qtd_chapas": novo_qtd_chapas,
+            "tempo_total": novo_tempo_str
+        }).eq("maquina", maquina).execute()
+    else:
+        excluir_do_corte(maquina)
+
+    registrar_evento(maquina, "finalizado", atual["proposta"], atual["cnc"])
 
 def excluir_da_fila(maquina, id_trabalho):
     supabase.table("fila_maquinas").delete().eq("maquina", maquina).eq("id", id_trabalho).execute()
@@ -71,30 +98,25 @@ def retornar_para_pendentes(maquina):
 
     grupo = f"{atual['proposta']}-{int(atual['espessura'] * 100):04}-{atual['material']}"
 
-    res = supabase.table("trabalhos_pendentes")\
-        .select("programador", "data_prevista", "processos")\
-        .eq("grupo", grupo)\
-        .eq("cnc", atual["cnc"]).execute()
-
-    dados = res.data[0] if res.data else {}
-
     trabalho = {
         "grupo": grupo,
         "proposta": atual["proposta"],
         "cnc": atual["cnc"],
         "material": atual["material"],
         "espessura": atual["espessura"],
-        "qtd_chapas": atual["qtd_chapas"],
+        "qtd_chapas": int(atual["qtd_chapas"]),
         "tempo_total": atual["tempo_total"],
-        "programador": dados.get("programador", "DESCONHECIDO"),
-        "data_prevista": dados.get("data_prevista", str(datetime.today().date())),
-        "processos": dados.get("processos") if dados.get("processos") else ["Corte Retornado"],
+        "programador": atual.get("programador", "DESCONHECIDO"),
+        "data_prevista": str(datetime.today().date()),
+        "processos": normalizar_processos(atual.get("processos")),
         "autorizado": True,
         "caminho": atual.get("caminho", f"CNC/{atual['cnc']}.pdf")
     }
 
     inserir_trabalho_pendente(trabalho)
     excluir_do_corte(maquina)
+
+    registrar_evento(maquina, "cancelado", atual["proposta"], atual["cnc"])
 
 def retornar_item_da_fila_para_pendentes(id_trabalho):
     res = supabase.table("fila_maquinas").select("*").eq("id", id_trabalho).execute()
@@ -103,14 +125,6 @@ def retornar_item_da_fila_para_pendentes(id_trabalho):
 
     item = res.data[0]
     grupo = f"{item['proposta']}-{int(item['espessura'] * 100):04}-{item['material']}"
-    cnc_alvo = item["cnc"]
-
-    dados_res = supabase.table("trabalhos_pendentes")\
-        .select("programador", "data_prevista", "processos")\
-        .eq("grupo", grupo)\
-        .eq("cnc", cnc_alvo).execute()
-
-    dados = dados_res.data[0] if dados_res.data else {}
 
     novo_trabalho = {
         "grupo": grupo,
@@ -118,17 +132,18 @@ def retornar_item_da_fila_para_pendentes(id_trabalho):
         "cnc": item["cnc"],
         "material": item["material"],
         "espessura": item["espessura"],
-        "qtd_chapas": item["qtd_chapas"],
+        "qtd_chapas": int(item["qtd_chapas"]),
         "tempo_total": item["tempo_total"],
-        "programador": dados.get("programador", "DESCONHECIDO"),
-        "data_prevista": dados.get("data_prevista", str(datetime.today().date())),
-        "processos": dados.get("processos") if dados.get("processos") else ["Corte Retornado"],
+        "programador": item.get("programador", "DESCONHECIDO"),
+        "data_prevista": str(datetime.today().date()),
+        "processos": normalizar_processos(item.get("processos")),
         "autorizado": True,
         "caminho": item.get("caminho", f"CNC/{item['cnc']}.pdf")
     }
 
     inserir_trabalho_pendente(novo_trabalho)
     excluir_da_fila(item["maquina"], id_trabalho)
+
 
 def atualizar_quantidade(maquina, nova_quantidade):
     supabase.table("corte_atual").update({"qtd_chapas": nova_quantidade}).eq("maquina", maquina).execute()
@@ -156,3 +171,43 @@ def excluir_trabalhos_grupo(grupo: str):
         .delete()\
         .eq("grupo", grupo)\
         .execute()
+    
+def timedelta_to_hms_string(td):
+    total_seconds = int(td.total_seconds())
+    hours, remainder = divmod(total_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return f"{hours:02}:{minutes:02}:{seconds:02}"
+
+def normalizar_processos(val):
+    if isinstance(val, list) and val:
+        return val
+    return ["Corte Retornado"]
+
+def retomar_interrupcao(maquina):
+    res = supabase.table("eventos_corte")\
+        .select("*")\
+        .eq("maquina", maquina)\
+        .eq("tipo_evento", "parado")\
+        .is_("tempo_total", None)\
+        .order("timestamp", desc=True)\
+        .limit(1)\
+        .execute()
+
+    if res.data:
+        parada = res.data[0]
+        inicio = datetime.fromisoformat(parada["timestamp"])
+        fim = datetime.now()
+        duracao = fim - inicio
+
+        registrar_evento(maquina, "retomado", parada["proposta"], parada["cnc"], tempo_total=str(duracao))
+
+def registrar_evento(maquina, tipo_evento, proposta, cnc, motivo=None, tempo_total=None):
+    supabase.table("eventos_corte").insert({
+        "maquina": maquina,
+        "proposta": proposta,
+        "cnc": cnc,
+        "tipo_evento": tipo_evento,
+        "timestamp": datetime.now().isoformat(),
+        "motivo": motivo,
+        "tempo_total": tempo_total
+    }).execute()

@@ -4,8 +4,9 @@ from utils.Junta_Trabalhos import carregar_trabalhos
 from utils.db import (
     adicionar_na_fila, obter_fila, atualizar_trabalho_pendente,
     obter_corte_atual, iniciar_corte, finalizar_corte,
-    excluir_da_fila, excluir_do_corte, retornar_para_pendentes,
-    retornar_item_da_fila_para_pendentes, excluir_trabalhos_grupo
+    retornar_para_pendentes, retomar_interrupcao,
+    retornar_item_da_fila_para_pendentes, excluir_trabalhos_grupo,
+    registrar_evento
 )
 
 MAQUINAS = ["LASER 1", "LASER 2", "LASER 3", "LASER 4", "LASER 5", "LASER 6"]
@@ -45,6 +46,43 @@ for trabalho in trabalhos_pendentes:
         titulo += f" | ⚙️ {trabalho.get('processos')}"
 
     with st.sidebar.expander(titulo):
+        # Seleção da máquina depois dos botões
+        maquina_escolhida = st.selectbox("Enviar para:", MAQUINAS, key=f"sel_maquina_{trabalho.get('grupo', '')}")
+        col_add, col_del = st.columns(2)
+        with col_add:
+            if st.button("➕ Adicionar à máquina", key=f"btn_{trabalho.get('grupo', '')}"):
+                for item in trabalho.get("detalhes", []):
+                    adicionar_na_fila(maquina_escolhida, {
+                        "proposta": trabalho.get("proposta", ""),
+                        "cnc": item.get("cnc", ""),
+                        "material": trabalho.get("material", ""),
+                        "espessura": trabalho.get("espessura", 0),
+                        "qtd_chapas": int(item.get("qtd_chapas", 0)),
+                        "tempo_total": item.get("tempo_total", ""),
+                        "caminho": item.get("caminho", ""),
+                        "programador": item.get("programador", "DESCONHECIDO")
+                    })
+
+                    atualizar_trabalho_pendente(
+                        cnc=item.get("cnc", ""),
+                        grupo=trabalho.get("grupo", ""),
+                        tempo_total=item.get("tempo_total", ""),
+                        data_prevista=trabalho.get("data_prevista"),
+                        processos=trabalho.get("processos"),
+                        autorizado=True
+                    )
+
+                excluir_trabalhos_grupo(trabalho.get("grupo", ""))
+                st.success(f"Trabalho enviado para {maquina_escolhida}")
+                st.rerun()
+
+        with col_del:
+            if st.button("🖑 Excluir Trabalho", key=f"del_{trabalho.get('grupo', '')}"):
+                excluir_trabalhos_grupo(trabalho.get("grupo", ""))
+                st.success("Trabalho excluído.")
+                st.rerun()
+
+        # Detalhes abaixo, como já faz:
         for item in trabalho.get("detalhes", []):
             with st.container(border=True):
                 col1, col2 = st.columns([2, 2])
@@ -61,32 +99,6 @@ for trabalho in trabalhos_pendentes:
                     else:
                         st.warning("Imagem de pré-visualização não encontrada.")
 
-        maquina_escolhida = st.selectbox("Enviar para:", MAQUINAS, key=f"sel_maquina_{trabalho.get('grupo', '')}")
-        if st.button("➕ Adicionar à máquina", key=f"btn_{trabalho.get('grupo', '')}"):
-            for item in trabalho.get("detalhes", []):
-                adicionar_na_fila(maquina_escolhida, {
-                    "proposta": trabalho.get("proposta", ""),
-                    "cnc": item.get("cnc", ""),
-                    "material": trabalho.get("material", ""),
-                    "espessura": trabalho.get("espessura", 0),
-                    "qtd_chapas": item.get("qtd_chapas", 0),
-                    "tempo_total": item.get("tempo_total", ""),
-                    "caminho": item.get("caminho", "")
-                })
-
-                atualizar_trabalho_pendente(
-                    cnc=item.get("cnc", ""),
-                    grupo=trabalho.get("grupo", ""),
-                    tempo_total=item.get("tempo_total", ""),
-                    data_prevista=trabalho.get("data_prevista"),
-                    processos=trabalho.get("processos"),
-                    autorizado=True
-                )
-
-            excluir_trabalhos_grupo(trabalho.get("grupo", ""))
-            st.success(f"Trabalho enviado para {maquina_escolhida}")
-            st.rerun()
-
 # =====================
 # Painel Principal - Máquinas
 # =====================
@@ -95,93 +107,104 @@ cols = st.columns(1)
 
 for i, maquina in enumerate(MAQUINAS):
     with cols[i % 1]:
-        st.markdown(f"## 🔧 {maquina}")
+        with st.container(border=True):
+            st.markdown(f"## 🔧 {maquina}")
 
-        corte = obter_corte_atual(maquina)
-        fila = obter_fila(maquina)
+            corte = obter_corte_atual(maquina)
+            fila = obter_fila(maquina)
 
-        if corte:
-            st.markdown(
-                f"**🔹 Corte Atual:** {corte.get('qtd_chapas', 'N/D')} | CNC {corte.get('cnc', 'N/D')} | "
-                f"{corte.get('material', 'N/D')} | {corte.get('espessura', 'N/D')} mm"
-            )
-            col_fim, col_ret, col_exc = st.columns(3)
+            if corte:
+                st.markdown(
+                    f"**🔹 Corte Atual:** {corte.get('qtd_chapas', 'N/D')} | CNC {corte.get('cnc', 'N/D')} | "
+                    f"{corte.get('material', 'N/D')} | {corte.get('espessura', 'N/D')} mm"
+                )
+                col_fim, col_intr, col_ret, col_pend = st.columns(4)
 
-            with col_fim:
-                if st.button("✅ Finalizar Corte Atual", key=f"fim_{maquina}"):
-                    finalizar_corte(maquina)
-                    st.success("Corte finalizado")
-                    st.rerun()
+                with col_fim:
+                    if st.button("✅ Finalizar Corte Atual", key=f"fim_{maquina}"):
+                        finalizar_corte(maquina)
+                        st.success("Corte finalizado")
+                        st.rerun()
 
-            with col_ret:
-                if st.button("🔁 Retornar para Pendentes", key=f"ret_{maquina}"):
-                    retornar_para_pendentes(maquina)
-                    st.success("Trabalho retornado para pendentes")
-                    st.rerun()
+                with col_intr:
+                    if st.button("⏸️ Parar Corte", key=f"parar_{maquina}"):
+                        with st.dialog("Interrupção de Corte"):
+                            motivo = st.text_area("Motivo da Interrupção")
+                            if st.button("Confirmar Parada", key=f"confirmar_parada_{maquina}"):
+                                corte = obter_corte_atual(maquina)
+                                if corte:
+                                    registrar_evento(maquina, "parado", corte["proposta"], corte["cnc"], motivo=motivo)
+                                    st.success("Interrupção registrada.")
+                                    st.rerun()
 
-            with col_exc:
-                if st.button("🖑 Excluir Corte Atual", key=f"exc_{maquina}"):
-                    excluir_do_corte(maquina)
-                    st.success("Corte excluído")
-                    st.rerun()
-        else:
-            st.markdown("_Nenhum corte em andamento_")
+                with col_ret:
+                    if st.button("▶️ Retomar Corte", key=f"retomar_{maquina}"):
+                        retomar_interrupcao(maquina)
+                        st.success("Corte retomado.")
+                        st.rerun()
 
-        if fila:
-            st.markdown("### 📋 Fila de Espera")
+                with col_pend:
+                    if st.button("🔁 Retornar para Pendentes", key=f"ret_{maquina}"):
+                        retornar_para_pendentes(maquina)
+                        st.success("Trabalho retornado para pendentes")
+                        st.rerun()
 
-            dados_fila = []
-            opcoes = {}
+            else:
+                st.markdown("_Nenhum corte em andamento_")
 
-            for item in fila:
-                item_dict = {
-                    "ID": item.get("id"),
-                    "Máquina": item.get("maquina"),
-                    "Proposta": item.get("proposta"),
-                    "CNC": item.get("cnc"),
-                    "Material": item.get("material"),
-                    "Espessura": item.get("espessura"),
-                    "Quantidade": item.get("qtd_chapas"),
-                    "Tempo": item.get("tempo_total"),
-                    "Caminho": item.get("caminho", ""),
-                    "Local Separado": ""
-                                    }
-                dados_fila.append(item_dict)
-                chave_opcao = f"{item_dict['Proposta']} | CNC {item_dict['CNC']}"
-                opcoes[chave_opcao] = item_dict["ID"]
+            if fila:
+                st.markdown("### 📋 Fila de Espera")
 
-            df_visual = pd.DataFrame(dados_fila)
+                dados_fila = []
+                opcoes = {}
 
-            config = {
-                "Caminho": st.column_config.ImageColumn(),
-            }
+                for item in fila:
+                    item_dict = {
+                        "ID": item.get("id"),
+                        "Máquina": item.get("maquina"),
+                        "Proposta": item.get("proposta"),
+                        "CNC": item.get("cnc"),
+                        "Material": item.get("material"),
+                        "Espessura": item.get("espessura"),
+                        "Quantidade": item.get("qtd_chapas"),
+                        "Tempo": item.get("tempo_total"),
+                        "Caminho": item.get("caminho", ""),
+                        "Local Separado": ""
+                                        }
+                    dados_fila.append(item_dict)
+                    chave_opcao = f"{item_dict['Proposta']} | CNC {item_dict['CNC']}"
+                    opcoes[chave_opcao] = item_dict["ID"]
 
-            st.data_editor(
-                df_visual[["Local Separado", "Proposta", "Material", "Espessura", "CNC", "Quantidade", "Tempo", "Caminho"]],
-                column_config=config,
-                hide_index=True,
-                use_container_width=True
-            )
+                df_visual = pd.DataFrame(dados_fila)
 
-            escolha = st.selectbox("Escolha próximo CNC:", list(opcoes.keys()), key=f"escolha_{maquina}")
-            col_iniciar, col_ret, col_excluir_fila = st.columns(3)
+                config = {
+                    "Caminho": st.column_config.ImageColumn(),
+                }
 
-            with col_iniciar:
-                if st.button("▶️ Iniciar Corte", key=f"iniciar_{maquina}"):
-                    iniciar_corte(maquina, opcoes[escolha])
-                    st.success("Corte iniciado")
-                    st.rerun()
+                st.data_editor(
+                    df_visual[["Local Separado", "Proposta", "Material", "Espessura", "CNC", "Quantidade", "Tempo", "Caminho"]],
+                    column_config=config,
+                    hide_index=True,
+                    use_container_width=True
+                )
 
-            with col_ret:
-                if st.button("🔁 Retornar CNC para Pendentes", key=f"ret_fila_{maquina}"):
-                    retornar_item_da_fila_para_pendentes(opcoes[escolha])
-                    st.success("Item da fila retornado para pendentes")
-                    st.rerun()
+                escolha = st.selectbox("Escolha próximo CNC:", list(opcoes.keys()), key=f"escolha_{maquina}")
+                col_iniciar, col_ret, col_excluir_fila = st.columns(3)
 
-            with col_excluir_fila:
-                if st.button("🖑 Excluir da Fila", key=f"exc_fila_{maquina}"):
-                    excluir_da_fila(maquina, opcoes[escolha])
-                    st.success("Item excluído da fila")
-                    st.rerun()
-        else:
-            st.markdown("_Fila vazia_")
+                with col_iniciar:
+                    if st.button("▶️ Iniciar Corte", key=f"iniciar_{maquina}"):
+                        if corte:
+                            st.warning("Finalize o corte atual antes de iniciar um novo.")
+                        else:
+                            iniciar_corte(maquina, opcoes[escolha])
+                            st.success("Corte iniciado")
+                            st.rerun()
+
+                with col_ret:
+                    if st.button("🔁 Retornar CNC para Pendentes", key=f"ret_fila_{maquina}"):
+                        retornar_item_da_fila_para_pendentes(opcoes[escolha])
+                        st.success("Item da fila retornado para pendentes")
+                        st.rerun()
+
+            else:
+                st.markdown("_Fila vazia_")
