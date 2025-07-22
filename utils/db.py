@@ -1,5 +1,12 @@
 from utils.supabase import supabase
+
+import plotly.graph_objects as go
+import pandas as pd
+import streamlit as st
+
 from datetime import datetime, timedelta
+from pytz import timezone
+from dateutil import parser
 
 def inserir_trabalho_pendente(dados):
     supabase.table("trabalhos_pendentes").insert(dados).execute()
@@ -62,12 +69,10 @@ def finalizar_corte(maquina):
         excluir_do_corte(maquina)
         return
 
-    # Tempo total atual em string "HH:MM:SS" => timedelta
     tempo_total_str = atual["tempo_total"]
     h, m, s = map(int, tempo_total_str.split(":"))
     tempo_total = timedelta(hours=h, minutes=m, seconds=s)
 
-    # Recalcula tempo restante proporcionalmente
     tempo_por_chapa = tempo_total / qtd_chapas
     novo_qtd_chapas = qtd_chapas - 1
 
@@ -79,10 +84,16 @@ def finalizar_corte(maquina):
             "qtd_chapas": novo_qtd_chapas,
             "tempo_total": novo_tempo_str
         }).eq("maquina", maquina).execute()
-    else:
-        excluir_do_corte(maquina)
 
-    registrar_evento(maquina, "finalizado", atual["proposta"], atual["cnc"])
+        # NÃO registrar evento 'finalizado' ainda, pois ainda há chapas
+        # Pode registrar outro evento se quiser, ex: "chapa_finalizada"
+        registrar_evento(maquina, "chapa_finalizada", atual["proposta"], atual["cnc"])
+
+    else:
+        # Última chapa finalizada: excluir corte e registrar evento 'finalizado'
+        excluir_do_corte(maquina)
+        registrar_evento(maquina, "finalizado", atual["proposta"], atual["cnc"])
+
 
 def excluir_da_fila(maquina, id_trabalho):
     supabase.table("fila_maquinas").delete().eq("maquina", maquina).eq("id", id_trabalho).execute()
@@ -195,11 +206,24 @@ def retomar_interrupcao(maquina):
 
     if res.data:
         parada = res.data[0]
-        inicio = datetime.fromisoformat(parada["timestamp"])
-        fim = datetime.now()
+
+        # Converte a string para datetime aware
+        inicio = parser.isoparse(parada["timestamp"])
+        fim = datetime.now(timezone("America/Sao_Paulo"))
+
+        # Garante que ambos são aware
+        if inicio.tzinfo is None:
+            inicio = inicio.replace(tzinfo=timezone("America/Sao_Paulo"))
+
         duracao = fim - inicio
 
-        registrar_evento(maquina, "retomado", parada["proposta"], parada["cnc"], tempo_total=str(duracao))
+        registrar_evento(
+            maquina,
+            "retomado",
+            parada["proposta"],
+            parada["cnc"],
+            tempo_total=str(duracao)
+        )
 
 def registrar_evento(maquina, tipo_evento, proposta, cnc, motivo=None, tempo_total=None):
     supabase.table("eventos_corte").insert({
@@ -211,3 +235,94 @@ def registrar_evento(maquina, tipo_evento, proposta, cnc, motivo=None, tempo_tot
         "motivo": motivo,
         "tempo_total": tempo_total
     }).execute()
+
+def obter_eventos_corte(maquina):
+    res = supabase.table("eventos_corte")\
+        .select("*")\
+        .eq("maquina", maquina)\
+        .order("timestamp", desc=False)\
+        .execute()
+    return res.data
+
+def mostrar_grafico_eventos(maquina):
+    eventos = obter_eventos_corte(maquina)
+
+    if not eventos:
+        st.info("Sem eventos registrados para essa máquina.")
+        return
+
+    df = pd.DataFrame(eventos)
+    df["timestamp"] = pd.to_datetime(df["timestamp"])
+
+    # Mapeia tipo_evento para status binário
+    df["status"] = df["tipo_evento"].map({
+        "iniciado": 1,
+        "retomado": 1,
+        "finalizado": 0,
+        "parado": -1,
+        "cancelado": 0,
+        "chapa_finalizada": 1  # mantém máquina ligada enquanto chapas forem finalizadas
+    }).fillna(method='ffill')  # ou .fillna(1) se preferir assumir ligada se evento desconhecido
+
+    df = df.sort_values("timestamp")
+
+    # Cria texto de hover (exibe quando o mouse passa por cima)
+    df["hover_text"] = df.apply(
+        lambda row: f"{row['tipo_evento'].upper()}<br>"
+                    f"CNC: {row.get('cnc', '')}<br>"
+                    f"Proposta: {row.get('proposta', '')}<br>"
+                    f"Motivo: {row.get('motivo', '') if row['tipo_evento'] == 'parado' else ''}",
+        axis=1
+    )
+
+    fig = go.Figure()
+
+    fig.add_trace(go.Scatter(
+        x=df["timestamp"],
+        y=df["status"],
+        mode="lines+markers",
+        line_shape="hv",  # simula step
+        name="Status da máquina",
+        text=df["hover_text"],
+        hoverinfo="text"
+    ))
+
+    # (Opcional) Adiciona anotação nos eventos "parado"
+    for _, row in df[df["tipo_evento"] == "parado"].iterrows():
+        fig.add_annotation(
+            x=row["timestamp"],
+            y=-1,
+            text=row.get("motivo", "Sem motivo"),
+            showarrow=True,
+            arrowhead=1,
+            ax=0,
+            ay=-30,
+            bgcolor="#0E1117",
+            font=dict(size=10, color="white")
+        )
+
+    fig.update_layout(
+        yaxis=dict(
+            tickvals=[-1, 0, 1],
+            ticktext=["Interrupção", "Parado", "Funcionando"],
+            range=[-1.5, 1.5]
+        ),
+        title=f"Atividade da Máquina: {maquina}",
+        xaxis_title="Horário",
+        yaxis_title="Status",
+        height=300
+    )
+
+    fig.add_trace(go.Scatter(
+        x=df["timestamp"],
+        y=df["status"],
+        mode="lines+markers",
+        line=dict(color="white"),
+        name="Status da máquina",
+        text=df["hover_text"],
+        hoverinfo="text",
+        line_shape="hv"
+    ))
+
+
+    st.plotly_chart(fig, use_container_width=True)

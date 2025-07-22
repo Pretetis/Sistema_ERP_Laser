@@ -6,13 +6,14 @@ from utils.db import (
     obter_corte_atual, iniciar_corte, finalizar_corte,
     retornar_para_pendentes, retomar_interrupcao,
     retornar_item_da_fila_para_pendentes, excluir_trabalhos_grupo,
-    registrar_evento
+    registrar_evento, mostrar_grafico_eventos
 )
 
 MAQUINAS = ["LASER 1", "LASER 2", "LASER 3", "LASER 4", "LASER 5", "LASER 6"]
 
 from streamlit_autorefresh import st_autorefresh
 from utils.navegacao import barra_navegacao
+from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCo
 
 # Atualiza automaticamente a cada 7 segundos
 #st_autorefresh(interval=7000, key="data_refresh")
@@ -105,6 +106,16 @@ for trabalho in trabalhos_pendentes:
 st.markdown("---")
 cols = st.columns(1)
 
+@st.dialog("Interrupção de Corte")
+def abrir_dialogo_interrupcao(maquina):
+    motivo = st.text_area("Motivo da Interrupção", key=f"motivo_{maquina}")
+    if st.button("Confirmar Parada", key=f"confirmar_parada_{maquina}"):
+        corte = obter_corte_atual(maquina)
+        if corte:
+            registrar_evento(maquina, "parado", corte["proposta"], corte["cnc"], motivo=motivo)
+            st.success("Interrupção registrada.")
+            st.rerun()
+
 for i, maquina in enumerate(MAQUINAS):
     with cols[i % 1]:
         with st.container(border=True):
@@ -128,14 +139,7 @@ for i, maquina in enumerate(MAQUINAS):
 
                 with col_intr:
                     if st.button("⏸️ Parar Corte", key=f"parar_{maquina}"):
-                        with st.dialog("Interrupção de Corte"):
-                            motivo = st.text_area("Motivo da Interrupção")
-                            if st.button("Confirmar Parada", key=f"confirmar_parada_{maquina}"):
-                                corte = obter_corte_atual(maquina)
-                                if corte:
-                                    registrar_evento(maquina, "parado", corte["proposta"], corte["cnc"], motivo=motivo)
-                                    st.success("Interrupção registrada.")
-                                    st.rerun()
+                        abrir_dialogo_interrupcao(maquina)
 
                 with col_ret:
                     if st.button("▶️ Retomar Corte", key=f"retomar_{maquina}"):
@@ -151,6 +155,8 @@ for i, maquina in enumerate(MAQUINAS):
 
             else:
                 st.markdown("_Nenhum corte em andamento_")
+
+            st.divider()
 
             if fila:
                 st.markdown("### 📋 Fila de Espera")
@@ -208,3 +214,8 @@ for i, maquina in enumerate(MAQUINAS):
 
             else:
                 st.markdown("_Fila vazia_")
+
+            st.divider()
+
+            mostrar_grafico_eventos(maquina)
+        

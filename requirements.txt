@@ -8,3 +8,5 @@ supabase
 requests
 Pillow
 python-dotenv
+plotly
+streamlit-aggrid==0.2.3
