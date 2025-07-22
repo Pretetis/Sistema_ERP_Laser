@@ -13,7 +13,7 @@ MAQUINAS = ["LASER 1", "LASER 2", "LASER 3", "LASER 4", "LASER 5", "LASER 6"]
 
 from streamlit_autorefresh import st_autorefresh
 from utils.navegacao import barra_navegacao
-from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCo
+#from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCo
 
 # Atualiza automaticamente a cada 7 segundos
 #st_autorefresh(interval=7000, key="data_refresh")
