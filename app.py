@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+from streamlit_sortables import sort_items
 from utils.supabase import supabase
 
 from utils.Junta_Trabalhos import carregar_trabalhos
@@ -235,67 +236,40 @@ for i, maquina in enumerate(MAQUINAS):
                         st.success("Item da fila retornado para pendentes.")
                         st.rerun()
 
-                with aba_ordenacao:
-                    st.markdown("### 🔃 Ordem de Corte")
+            with aba_ordenacao:
+                st.markdown("### 🔃 Ordem de Corte")
 
-                    dados_ordenados = []
-                    for i, item in enumerate(fila):  # supondo que `fila` é uma lista de dicionários
-                        dados_ordenados.append({
-                            "ID": item.get("id"),
-                            "Arrastar": "⇅",  # coluna visual para servir como alça de arrasto
-                            "Proposta": item.get("proposta"),
-                            "CNC": item.get("cnc"),
-                            "Qtd Chapas": item.get("qtd_chapas"),
-                            "Material": item.get("material"),
-                            "Espessura": item.get("espessura"),
-                            "Posicao": item.get("posicao", 0)
-                        })
+                # Mapeia os dados da fila para itens visuais
+                mapa_itens = {}
+                elementos_drag = []
 
-                    df_aggrid = pd.DataFrame(dados_ordenados)
-
-                    # Criar opções da grid
-                    gb = GridOptionsBuilder.from_dataframe(df_aggrid)
-                    gb.configure_grid_options(
-                        rowDragManaged=True,  # controla drag pela posição
-                        animateRows=True
+                for item in fila:
+                    label = (
+                        f"📌 **{item['proposta']}** | CNC `{item['cnc']}` | "
+                        f"{item['material']} | {item['espessura']} mm | "
+                        f"🧾 {item['qtd_chapas']} chapas"
                     )
+                    if item.get("caminho", "").startswith("http"):
+                        label += f"\n\n![preview]({item['caminho']})"
+                    elementos_drag.append(label)
+                    mapa_itens[label] = item["id"]  # Associa visual → id
 
-                    # Coluna que habilita o drag (precisa estar visível)
-                    gb.configure_column(
-                        "Arrastar",
-                        header_name="↕️",
-                        rowDrag=True,
-                        width=40,
-                        suppressMovable=True
-                    )
+                # Exibe drag-and-drop
+                nova_ordem = sort_items(
+                    elementos_drag,
+                    direction="vertical",
+                )
 
-                    # Oculta colunas internas, se quiser
-                    gb.configure_column("ID", hide=True)
-                    gb.configure_column("Posicao", hide=True)
+                # Botão para salvar
+                if st.button("💾 Salvar Nova Ordem de Corte"):
+                    for nova_posicao, label in enumerate(nova_ordem):
+                        id_item = mapa_itens[label]
+                        supabase.table("fila_maquinas").update(
+                            {"posicao": nova_posicao}
+                        ).eq("id", id_item).execute()
 
-                    # Construir opções
-                    grid_options = gb.build()
-
-                    # Exibir tabela com drag-and-drop
-                    response = AgGrid(
-                        df_aggrid,
-                        gridOptions=grid_options,
-                        update_mode=GridUpdateMode.MODEL_CHANGED,
-                        fit_columns_on_grid_load=True,
-                        allow_unsafe_jscode=True,
-                        theme="streamlit",
-                        height=400
-                    )
-
-                    # Botão para salvar nova ordem
-                    if st.button("💾 Salvar Nova Ordem de Corte"):
-                        nova_ordem_df = response["data"].reset_index(drop=True)
-                        for nova_posicao, row in nova_ordem_df.iterrows():
-                            supabase.table("fila_maquinas").update(
-                                {"posicao": nova_posicao}
-                            ).eq("id", row["ID"]).execute()
-                        st.success("Ordem atualizada com sucesso.")
-                        st.rerun()
+                    st.success("Nova ordem de corte salva com sucesso.")
+                    st.rerun()
 
         else:
             st.markdown("_Fila vazia_")
