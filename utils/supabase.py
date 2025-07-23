@@ -36,17 +36,6 @@ def deletar_arquivo_supabase(nome_arquivo: str) -> bool:
 def upload_imagem_to_supabase(path_imagem: Path, destino: str = "aguardando_aprovacao") -> str:
     destino_final = f"{destino}/{path_imagem.name}"
 
-    # Remove imagem anterior se existir
-    deletar_arquivo_supabase(destino_final)
-
-    # Aguarda até a exclusão se concretizar
-    for _ in range(3):
-        if not arquivo_existe(destino_final):
-            break
-        time.sleep(1)
-    else:
-        raise Exception(f"O arquivo '{destino_final}' ainda existe após remoção. Upload cancelado.")
-
     # Upload da imagem
     with path_imagem.open("rb") as f:
         supabase.storage.from_(BUCKET_NAME).upload(
@@ -56,12 +45,3 @@ def upload_imagem_to_supabase(path_imagem: Path, destino: str = "aguardando_apro
         )
 
     return f"{SUPABASE_URL}/storage/v1/object/public/{BUCKET_NAME}/{destino_final}"
-
-# Baixar e salvar no disco
-def baixar_txt_para_disco(nome_arquivo: str, destino: Path) -> bool:
-    try:
-        conteudo = supabase.storage.from_(BUCKET_NAME).download(nome_arquivo)
-        destino.write_bytes(conteudo)
-        return True
-    except Exception:
-        return False

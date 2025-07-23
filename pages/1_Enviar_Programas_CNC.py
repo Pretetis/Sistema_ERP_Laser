@@ -1,10 +1,9 @@
 import streamlit as st
 import sys
 from pathlib import Path
-from streamlit_autorefresh import st_autorefresh
 import pandas as pd
 
-from utils.extracao import extrair_dados_por_posicao
+from utils.extracao import extrair_dados_por_posicao, processar_pdfs_da_pasta
 from utils.Junta_Trabalhos import carregar_trabalhos
 from utils.navegacao import barra_navegacao
 from utils.db import inserir_trabalho_pendente, atualizar_trabalho_pendente, excluir_trabalhos_grupo
@@ -33,32 +32,7 @@ from pathlib import Path
 import pandas as pd  # se ainda não importou
 
 if st.button("🗕️ Processar PDFs"):
-    for pdf in pdfs:
-        info = extrair_dados_por_posicao(pdf)
-        if info:
-            cnc = Path(pdf.name).stem  # Remove .pdf
-            
-            # Se tempo_total é string, converte para timedelta
-            tempo_td = pd.to_timedelta(info["tempo_total"]) if isinstance(info["tempo_total"], str) else info["tempo_total"]
-            
-            total_segundos = int(tempo_td.total_seconds())
-            tempo_formatado = f"{total_segundos // 3600:02}:{(total_segundos % 3600) // 60:02}:{total_segundos % 60:02}"
-            
-            inserir_trabalho_pendente({
-                "grupo": f"{info['proposta']}-{int(round(info['espessura']*100)):04d}-{info['material']}",
-                "proposta": info["proposta"],
-                "espessura": info["espessura"],
-                "material": info["material"],
-                "cnc": cnc,
-                "programador": info["programador"],
-                "qtd_chapas": info["qtd_chapas"],
-                "tempo_total": tempo_formatado,  # tempo formatado no padrão HH:MM:SS
-                "caminho": info["caminho"],
-                "data_prevista": None,
-                "processos": [],
-                "autorizado": False,
-                "gas": []
-            })
+    processar_pdfs_da_pasta()
     st.success("PDFs processados e registrados no banco de dados!")
 
 # =====================
