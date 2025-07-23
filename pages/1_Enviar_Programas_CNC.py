@@ -56,7 +56,8 @@ if st.button("🗕️ Processar PDFs"):
                 "caminho": info["caminho"],
                 "data_prevista": None,
                 "processos": [],
-                "autorizado": False
+                "autorizado": False,
+                "gas": []
             })
     st.success("PDFs processados e registrados no banco de dados!")
 
@@ -78,7 +79,18 @@ else:
         ):
 
             data_processo = st.date_input("Data", key=f"data_{trabalho['grupo']}", format="DD/MM/YYYY")
+
             processos_possiveis = ["Dobra", "Usinagem", "Solda", "Gravação", "Galvanização", "Pintura"]
+            gas_escolhido = st.radio(
+                "Selecione o gás",
+                options=["Padrão", "Nitrogênio", "Oxigênio", "Ar Comprimido", "Vaporizado"],
+                index=0,
+                key=f"gas_{trabalho['grupo']}",
+                horizontal=True
+            )
+
+            # Interpreta "Padrão" como None
+            gas_final = None if gas_escolhido == "Padrão" else gas_escolhido
             col_processos = st.columns(len(processos_possiveis))
             processos_selecionados = [
                 proc for i, proc in enumerate(processos_possiveis)
@@ -112,7 +124,8 @@ else:
                                 atualizar_trabalho_pendente(
                                     cnc=item['cnc'],
                                     grupo=trabalho['grupo'],
-                                    tempo_total=tempo_editado
+                                    tempo_total=tempo_editado,
+                                    gas=gas_final
                                 )
                                 st.success("Tempo atualizado com sucesso!")
                                 st.session_state[tempo_key] = False
@@ -138,7 +151,8 @@ else:
                             tempo_total=item['tempo_total'],
                             data_prevista=data_str,
                             processos=processos_final,
-                            autorizado=True
+                            autorizado=True,
+                            gas=gas_final
                         )
 
                     st.success(f"Trabalho do grupo {trabalho['grupo']} autorizado.")

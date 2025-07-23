@@ -3,105 +3,134 @@ import pandas as pd
 from streamlit_sortables import sort_items
 from utils.supabase import supabase
 
-from utils.Junta_Trabalhos import carregar_trabalhos
 from utils.db import (
-    adicionar_na_fila, obter_fila, atualizar_trabalho_pendente,
+    adicionar_na_fila, obter_fila,
     obter_corte_atual, iniciar_corte, finalizar_corte,
     retornar_para_pendentes, retomar_interrupcao,
     retornar_item_da_fila_para_pendentes, excluir_trabalhos_grupo,
     registrar_evento, mostrar_grafico_eventos
 )
 
-MAQUINAS = ["LASER 1", "LASER 2", "LASER 3", "LASER 4", "LASER 5", "LASER 6"]
-
 from streamlit_autorefresh import st_autorefresh
 from utils.navegacao import barra_navegacao
+from collections import defaultdict
 
-# Atualiza automaticamente a cada 7 segundos
-#st_autorefresh(interval=7000, key="data_refresh")
+MAQUINAS = ["LASER 1", "LASER 2", "LASER 3", "LASER 4", "LASER 5", "LASER 6"]
 
 st.set_page_config(page_title="Gestão de Corte", layout="wide")
 barra_navegacao()
 st.title("🛠️ Gestão de Produção")
 
+count = st_autorefresh(interval=15000, key="autorefresh")
+
+@st.dialog("Enviar CNC para Máquina")
+def modal_enviar_cnc(item):
+    st.markdown(f"### Enviar CNC `{item['cnc']}` para máquina")
+    maquina_escolhida = st.selectbox("Selecione a máquina", MAQUINAS, key=f"modal_sel_maquina_{item['id']}")
+    if st.button("🚀 Confirmar envio", key=f"confirmar_envio_{item['id']}"):
+        adicionar_na_fila(maquina_escolhida, {
+            "proposta": item["proposta"],
+            "cnc": item["cnc"],
+            "material": item["material"],
+            "espessura": item["espessura"],
+            "qtd_chapas": int(item["qtd_chapas"]),
+            "tempo_total": item["tempo_total"],
+            "caminho": item["caminho"],
+            "programador": item.get("programador", "DESCONHECIDO"),
+            "processos": item.get("processos", []),
+            "gas": item.get("gas", None)
+        })
+
+        # Remove apenas o CNC individual das pendências
+        supabase.table("trabalhos_pendentes") \
+            .delete() \
+            .eq("id", item["id"]) \
+            .execute()
+
+        st.success(f"CNC {item['cnc']} enviado para {maquina_escolhida}")
+        st.rerun()
+
 # =====================
-# Sidebar - Trabalhos Agrupados
+# Sidebar - Trabalhos Pendentes
 # =====================
 st.sidebar.title("📋 Trabalhos Pendentes")
-trabalhos = carregar_trabalhos()
-trabalhos_pendentes = trabalhos.get("trabalhos_pendentes", [])
+trabalhos_raw = supabase.table("trabalhos_pendentes").select("*").execute().data or []
 
-for trabalho in trabalhos_pendentes:
-    titulo = (
+grupos = defaultdict(list)
+for t in trabalhos_raw:
+    grupos[t["grupo"]].append(t)
+
+for grupo, itens in grupos.items():
+    trabalho = itens[0]
+    # Primeira linha do título
+    titulo_linha1 = (
         f"🔹 {trabalho.get('proposta', 'N/D')} | {trabalho.get('espessura', 'N/D')} mm | "
-        f"{trabalho.get('material', 'N/D')} | x {trabalho.get('qtd_total', 'N/D')} | "
-        f"⏱ {trabalho.get('tempo_total', 'N/D')}"
+        f"{trabalho.get('material', 'N/D')} | x{len(itens)} CNCs | ⏱ {trabalho.get('tempo_total', 'N/D')}"
     )
 
-    if trabalho.get("data_prevista"):
-        try:
-            data_fmt = "/".join(reversed(trabalho["data_prevista"].split("-")))
-            titulo += f" | 📅 {data_fmt}"
-        except Exception:
-            pass
+    # Segunda linha do título
+    data_fmt = "/".join(reversed(trabalho["data_prevista"].split("-")))
+    if trabalho.get("gas"):
+        gas_fmt = (f"💨 {trabalho.get('gas')}")
+    else :
+        gas_fmt = ""
 
-    if trabalho.get("processos"):
-        titulo += f" | ⚙️ {trabalho.get('processos')}"
+    titulo_linha2 = (f"📅 {data_fmt} | ⚙️ {trabalho.get('processos')} | {gas_fmt}")        
 
-    with st.sidebar.expander(titulo):
-        # Seleção da máquina depois dos botões
-        maquina_escolhida = st.selectbox("Enviar para:", MAQUINAS, key=f"sel_maquina_{trabalho.get('grupo', '')}")
+    titulo = f"{titulo_linha1}\n\n{titulo_linha2}"
+
+    with st.sidebar.expander(titulo, expanded=False):
+        maquina_escolhida = st.selectbox("Enviar todos para:", MAQUINAS, key=f"sel_maquina_{grupo}")
         col_add, col_del = st.columns(2)
         with col_add:
-            if st.button("➕ Adicionar à máquina", key=f"btn_{trabalho.get('grupo', '')}"):
-                for item in trabalho.get("detalhes", []):
+            if st.button("➕ Enviar todos para a máquina", key=f"btn_add_todos_{grupo}"):
+                for item in itens:
                     adicionar_na_fila(maquina_escolhida, {
-                        "proposta": trabalho.get("proposta", ""),
-                        "cnc": item.get("cnc", ""),
-                        "material": trabalho.get("material", ""),
-                        "espessura": trabalho.get("espessura", 0),
-                        "qtd_chapas": int(item.get("qtd_chapas", 0)),
-                        "tempo_total": item.get("tempo_total", ""),
-                        "caminho": item.get("caminho", ""),
-                        "programador": item.get("programador", "DESCONHECIDO")
+                        "proposta": item["proposta"],
+                        "cnc": item["cnc"],
+                        "material": item["material"],
+                        "espessura": item["espessura"],
+                        "qtd_chapas": int(item["qtd_chapas"]),
+                        "tempo_total": item["tempo_total"],
+                        "caminho": item["caminho"],
+                        "programador": item.get("programador", "DESCONHECIDO"),
+                        "processos": item.get("processos", []),
+                        "gas": item.get("gas", None),
+                        "data_prevista": item["data_prevista"]
                     })
 
-                    atualizar_trabalho_pendente(
-                        cnc=item.get("cnc", ""),
-                        grupo=trabalho.get("grupo", ""),
-                        tempo_total=item.get("tempo_total", ""),
-                        data_prevista=trabalho.get("data_prevista"),
-                        processos=trabalho.get("processos"),
-                        autorizado=True
-                    )
+                    # Remover cada item individualmente das pendências
+                    supabase.table("trabalhos_pendentes") \
+                        .delete() \
+                        .eq("id", item["id"]) \
+                        .execute()
 
-                excluir_trabalhos_grupo(trabalho.get("grupo", ""))
-                st.success(f"Trabalho enviado para {maquina_escolhida}")
+                st.success(f"Todos os CNCs enviados para {maquina_escolhida}")
                 st.rerun()
 
         with col_del:
-            if st.button("🖑 Excluir Trabalho", key=f"del_{trabalho.get('grupo', '')}"):
-                excluir_trabalhos_grupo(trabalho.get("grupo", ""))
+            if st.button("🖑 Excluir Trabalho", key=f"del_{grupo}"):
+                excluir_trabalhos_grupo(grupo)
                 st.success("Trabalho excluído.")
                 st.rerun()
 
-        # Detalhes abaixo, como já faz:
-        for item in trabalho.get("detalhes", []):
+        for item in itens:
             with st.container(border=True):
                 col1, col2 = st.columns([2, 2])
                 with col1:
-                    st.markdown(f"**Programador:** {item.get('programador', 'DESCONHECIDO')}")
-                    st.markdown(f"**CNC:** {item.get('cnc', 'DESCONHECIDO')}")
-                    st.markdown(f"**Qtd Chapas:** {item.get('qtd_chapas', 'DESCONHECIDO')}")
-                    st.markdown(f"**Tempo Total:** {item.get('tempo_total', 'DESCONHECIDO')}")
+                    st.markdown(f"**Programador:** {item['programador']}")
+                    st.markdown(f"**CNC:** {item['cnc']}")
+                    st.markdown(f"**Qtd Chapas:** {item['qtd_chapas']}")
+                    st.markdown(f"**Tempo Total:** {item['tempo_total']}")
+
+                    if st.button("📄 Enviar CNC para Máquina", key=f"btn_enviar_cnc_{item['id']}"):
+                        modal_enviar_cnc(item)
 
                 with col2:
-                    caminho_imagem = item.get("caminho")
-                    if caminho_imagem and caminho_imagem.startswith("http") and caminho_imagem.lower().endswith((".png", ".jpg", ".jpeg")):
-                        st.image(caminho_imagem, caption=f"CNC {item.get('cnc', '')}", use_container_width=True)
+                    if item["caminho"].startswith("http"):
+                        st.image(item["caminho"], caption=f"CNC {item['cnc']}", use_container_width=True)
                     else:
-                        st.warning("Imagem de pré-visualização não encontrada.")
-
+                        st.warning("Imagem não encontrada.")
 # =====================
 # Painel Principal - Máquinas
 # =====================
@@ -181,7 +210,8 @@ for i, maquina in enumerate(MAQUINAS):
                         "Quantidade": item.get("qtd_chapas"),
                         "Tempo": item.get("tempo_total"),
                         "Caminho": item.get("caminho", ""),
-                        "Local Separado": item.get("local_separado", "")
+                        "Local Separado": item.get("local_separado", ""),
+                        "Gás": item.get("gas", "")
                     })
 
                 df_visual = pd.DataFrame(dados_fila)
@@ -196,7 +226,7 @@ for i, maquina in enumerate(MAQUINAS):
                         config[col] = st.column_config.TextColumn(disabled=True)
 
                 edited_df = st.data_editor(
-                    df_visual.drop(columns=["ID"]),  # ID só usado internamente
+                    df_visual.drop(columns=["ID", "Máquina"]),
                     column_config=config,
                     hide_index=True,
                     use_container_width=True,

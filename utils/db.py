@@ -22,7 +22,9 @@ def adicionar_na_fila(maquina, trabalho):
         "tempo_total": trabalho["tempo_total"],
         "caminho": trabalho.get("caminho", ""),
         "programador": trabalho["programador"],
-        "processos": normalizar_processos(trabalho.get("processos"))
+        "processos": normalizar_processos(trabalho.get("processos")),
+        "gas": trabalho.get("gas", None),
+        "data_prevista": trabalho["data_prevista"]
     }).execute()
 
 def obter_fila(maquina):
@@ -58,7 +60,9 @@ def iniciar_corte(maquina, id_fila):
         "tempo_total": item["tempo_total"],
         "caminho": item["caminho"],
         "programador": item["programador"],
-        "processos": item.get("processos")
+        "processos": item.get("processos"),
+        "gas": item.get("gas", None),
+        "data_prevista": item["data_prevista"]
     }).execute()
 
     registrar_evento(maquina, "iniciado", item["proposta"], item["cnc"])
@@ -122,10 +126,11 @@ def retornar_para_pendentes(maquina):
         "qtd_chapas": int(atual["qtd_chapas"]),
         "tempo_total": atual["tempo_total"],
         "programador": atual.get("programador", "DESCONHECIDO"),
-        "data_prevista": str(datetime.today().date()),
+        "data_prevista": atual["data_prevista"],
         "processos": normalizar_processos(atual.get("processos")),
         "autorizado": True,
-        "caminho": atual.get("caminho", f"CNC/{atual['cnc']}.pdf")
+        "caminho": atual.get("caminho", f"CNC/{atual['cnc']}.pdf"),
+        "gas": atual.get("gas", None)
     }
 
     inserir_trabalho_pendente(trabalho)
@@ -150,10 +155,11 @@ def retornar_item_da_fila_para_pendentes(id_trabalho):
         "qtd_chapas": int(item["qtd_chapas"]),
         "tempo_total": item["tempo_total"],
         "programador": item.get("programador", "DESCONHECIDO"),
-        "data_prevista": str(datetime.today().date()),
+        "data_prevista": item["data_prevista"],
         "processos": normalizar_processos(item.get("processos")),
         "autorizado": True,
-        "caminho": item.get("caminho", f"CNC/{item['cnc']}.pdf")
+        "caminho": item.get("caminho"," "),
+        "gas": item.get("gas", None)
     }
 
     inserir_trabalho_pendente(novo_trabalho)
@@ -164,12 +170,13 @@ def atualizar_quantidade(maquina, nova_quantidade):
     supabase.table("corte_atual").update({"qtd_chapas": nova_quantidade}).eq("maquina", maquina).execute()
 
 
-def atualizar_trabalho_pendente(cnc, grupo, tempo_total, data_prevista=None, processos=None, autorizado=False):
+def atualizar_trabalho_pendente(cnc, grupo, tempo_total, data_prevista=None, processos=None, autorizado=False, gas=None):
     update_data = {
         "tempo_total": tempo_total,
         "data_prevista": data_prevista,
         "processos": processos,
-        "autorizado": autorizado
+        "autorizado": autorizado,
+        "gas": gas
     }
 
     # Remove campos nulos para evitar sobrescrita
