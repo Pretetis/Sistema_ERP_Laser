@@ -16,9 +16,6 @@ MAQUINAS = ["LASER 1", "LASER 2", "LASER 3", "LASER 4", "LASER 5", "LASER 6"]
 
 from streamlit_autorefresh import st_autorefresh
 from utils.navegacao import barra_navegacao
-from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
-
-#from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCo
 
 # Atualiza automaticamente a cada 7 segundos
 #st_autorefresh(interval=7000, key="data_refresh")
@@ -290,16 +287,56 @@ for i, maquina in enumerate(MAQUINAS):
                     custom_style=estilo_azul_escuro
                 )
 
-                if st.button("💾 Salvar Nova Ordem de Corte", key=f"salvar_ordem_{maquina}"):
-                    for nova_posicao, label in enumerate(nova_ordem[0]['items']):
-                        id_item = mapa_itens.get(label)
-                        if id_item:
+                col_sel1, col_sel2, col_sel3, col_salvar = st.columns([2, 2, 2, 2])
+
+                with col_sel1:
+                    propostas = ["--"] + sorted(set(item["proposta"] for item in fila))
+                    proposta_selecionada = st.selectbox("Proposta", propostas, key=f"sel_proposta_{maquina}")
+
+                with col_sel2:
+                    materiais_filtrados = [
+                        item["material"] for item in fila
+                        if item["proposta"] == proposta_selecionada
+                    ] if proposta_selecionada != "--" else []
+                    materiais = ["--"] + sorted(set(materiais_filtrados))
+                    material_selecionado = st.selectbox("Material", materiais, key=f"sel_material_{maquina}")
+
+                with col_sel3:
+                    espessuras_filtradas = [
+                        item["espessura"] for item in fila
+                        if item["proposta"] == proposta_selecionada and item["material"] == material_selecionado
+                    ] if proposta_selecionada != "--" and material_selecionado != "--" else []
+                    espessuras = ["--"] + sorted(set(espessuras_filtradas))
+                    espessura_selecionada = st.selectbox("Espessura", espessuras, key=f"sel_espessura_{maquina}")
+
+                with col_salvar:
+                    if st.button("💾 Salvar Nova Ordem de Corte", key=f"salvar_ordem_{maquina}"):
+                        nova_ordem_ids = [mapa_itens[label] for label in nova_ordem[0]["items"]]
+
+                        if (
+                            proposta_selecionada != "--" and
+                            material_selecionado != "--" and
+                            espessura_selecionada != "--"
+                        ):
+                            ids_prioritarios = [
+                                item["id"]
+                                for item in fila
+                                if item["proposta"] == proposta_selecionada and
+                                item["material"] == material_selecionado and
+                                item["espessura"] == espessura_selecionada
+                            ]
+                            nova_ordem_ids = [id_ for id_ in nova_ordem_ids if id_ not in ids_prioritarios]
+                            nova_ordem_ids = ids_prioritarios + nova_ordem_ids
+
+                        # Atualiza posições no banco
+                        for nova_posicao, id_item in enumerate(nova_ordem_ids):
                             supabase.table("fila_maquinas").update(
                                 {"posicao": nova_posicao}
                             ).eq("id", id_item).execute()
 
-                    st.success("Nova ordem de corte salva com sucesso.")
-                    st.rerun()
+                        st.success("Nova ordem de corte salva com sucesso.")
+                        st.rerun()
+
 
         else:
             st.markdown("_Fila vazia_")
