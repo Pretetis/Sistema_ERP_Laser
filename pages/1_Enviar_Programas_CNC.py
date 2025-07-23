@@ -3,6 +3,7 @@ import sys
 from pathlib import Path
 from streamlit_autorefresh import st_autorefresh
 import pandas as pd
+from datetime import date
 
 from utils.extracao import extrair_dados_por_posicao
 from utils.Junta_Trabalhos import carregar_trabalhos
@@ -54,7 +55,7 @@ if st.button("🗕️ Processar PDFs"):
                 "qtd_chapas": info["qtd_chapas"],
                 "tempo_total": tempo_formatado,  # tempo formatado no padrão HH:MM:SS
                 "caminho": info["caminho"],
-                "data_prevista": None,
+                "data_prevista": date.today().isoformat(),
                 "processos": [],
                 "autorizado": False,
                 "gas": []
