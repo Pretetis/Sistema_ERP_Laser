@@ -54,7 +54,13 @@ def modal_enviar_cnc(item):
 # Sidebar - Trabalhos Pendentes
 # =====================
 st.sidebar.title("📋 Trabalhos Pendentes")
-trabalhos_raw = supabase.table("trabalhos_pendentes").select("*").execute().data or []
+trabalhos_raw = (
+    supabase.table("trabalhos_pendentes")
+    .select("*")
+    .eq("autorizado", True)
+    .execute()
+    .data or []
+)
 
 grupos = defaultdict(list)
 for t in trabalhos_raw:
@@ -373,3 +379,5 @@ for i, maquina in enumerate(MAQUINAS):
 
         st.divider()
         mostrar_grafico_eventos(maquina)
+dados_debug = supabase.table("trabalhos_pendentes").select("*").limit(1).execute().data
+st.write(dados_debug)

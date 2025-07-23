@@ -9,6 +9,7 @@ from utils.extracao import extrair_dados_por_posicao
 from utils.Junta_Trabalhos import carregar_trabalhos
 from utils.navegacao import barra_navegacao
 from utils.db import inserir_trabalho_pendente, atualizar_trabalho_pendente, excluir_trabalhos_grupo
+from utils.supabase import supabase
 
 # Adiciona caminho do projeto para importar corretamente
 sys.path.append(str(Path(__file__).resolve().parent.parent))
@@ -27,7 +28,7 @@ st.markdown("""
 # =====================
 # 1. Upload dos PDFs
 # =====================
-st.markdown("Faça o upload dos arquivos `.pdf` dos programas CNC.")
+st.markdown("Faça o upload dos arquivos .pdf dos programas CNC.")
 pdfs = st.file_uploader("Selecione os arquivos PDF", type="pdf", accept_multiple_files=True)
 
 from pathlib import Path
