@@ -235,45 +235,68 @@ for i, maquina in enumerate(MAQUINAS):
                         retornar_item_da_fila_para_pendentes(opcoes[escolha])
                         st.success("Item da fila retornado para pendentes.")
                         st.rerun()
-
             with aba_ordenacao:
                 st.markdown("### 🔃 Ordem de Corte")
 
-                # Mapeia os dados da fila para itens visuais
                 mapa_itens = {}
                 elementos_drag = []
 
                 for item in fila:
-                    caminho_img = item.get("caminho", "")
-                    
-                    label = f"""📌 **Proposta:** {item['proposta']}
-                📄 **CNC:** {item['cnc']}
-                🧪 **Material:** {item['material']} | **Espessura:** {item['espessura']} mm
-                📦 **Qtde:** {item['qtd_chapas']} | ⏱️ **Tempo:** {item.get('tempo_total', '')}
-                """
-
-                    # Adiciona imagem se houver
-                    if caminho_img.startswith("http"):
-                        label += f"\n![preview]({caminho_img})"
-
-                    label += "\n---"  # Separador visual
+                    # Garante unicidade no rótulo com ID oculto
+                    label = f"""📌 Proposta: {item['proposta']} | 📄 CNC: {item['cnc']} | 🧪 Material: {item['material']} | Esp: {item['espessura']} mm  
+            📦 Qtd: {item['qtd_chapas']} | ⏱️ Tempo: {item.get('tempo_total', '')} | ID: {item['id']}"""  # ID invisível para diferenciar
 
                     elementos_drag.append(label)
                     mapa_itens[label] = item["id"]
 
-                # Exibe drag-and-drop
+                estilo_azul_escuro = """
+                .sortable-component {
+                    background-color: #0F1117;
+                    font-family: monospace;
+                    font-size: 16px;
+                    counter-reset: item;
+                }
+                .sortable-container {
+                    background-color: #14161A;
+                    border: 2px solid #00CFFF;
+                    border-radius: 10px;
+                    padding: 5px;
+                }
+                .sortable-container-header {
+                    background-color: #0E1117;
+                    color: #00FFFF;
+                    font-weight: bold;
+                    padding: 0.5rem 1rem;
+                }
+                .sortable-container-body {
+                    background-color: #14161A;
+                }
+                .sortable-item, .sortable-item:hover {
+                    background-color: #0E1117;
+                    color: #FFFFFF;
+                    font-weight: normal;
+                    border-bottom: 1px solid #222;
+                    padding: 0.5rem 1rem;
+                }
+                .sortable-item::before {
+                    content: counter(item) ". ";
+                    counter-increment: item;
+                }
+                """
+
                 nova_ordem = sort_items(
-                    elementos_drag,
-                    direction="vertical",
+                    [{'header': f'📋 Fila da {maquina}', 'items': elementos_drag}],
+                    multi_containers=True,
+                    custom_style=estilo_azul_escuro
                 )
 
-                # Botão para salvar
-                if st.button("💾 Salvar Nova Ordem de Corte"):
-                    for nova_posicao, label in enumerate(nova_ordem):
-                        id_item = mapa_itens[label]
-                        supabase.table("fila_maquinas").update(
-                            {"posicao": nova_posicao}
-                        ).eq("id", id_item).execute()
+                if st.button("💾 Salvar Nova Ordem de Corte", key=f"salvar_ordem_{maquina}"):
+                    for nova_posicao, label in enumerate(nova_ordem[0]['items']):
+                        id_item = mapa_itens.get(label)
+                        if id_item:
+                            supabase.table("fila_maquinas").update(
+                                {"posicao": nova_posicao}
+                            ).eq("id", id_item).execute()
 
                     st.success("Nova ordem de corte salva com sucesso.")
                     st.rerun()
