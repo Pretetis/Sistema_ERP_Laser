@@ -45,3 +45,12 @@ def upload_imagem_to_supabase(path_imagem: Path, destino: str = "aguardando_apro
         )
 
     return f"{SUPABASE_URL}/storage/v1/object/public/{BUCKET_NAME}/{destino_final}"
+
+# Baixar e salvar no disco
+def baixar_txt_para_disco(nome_arquivo: str, destino: Path) -> bool:
+    try:
+        conteudo = supabase.storage.from_(BUCKET_NAME).download(nome_arquivo)
+        destino.write_bytes(conteudo)
+        return True
+    except Exception:
+        return False

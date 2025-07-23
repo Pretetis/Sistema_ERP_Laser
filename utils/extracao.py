@@ -72,32 +72,29 @@ def extrair_dados_por_posicao(arquivo_pdf):
 
 
 # 🔍 Processa todos os PDFs na pasta CNC e salva no banco
-def processar_pdfs_da_pasta():
-    arquivos_pdf = list(pasta_cnc.glob("*.pdf"))
+arquivos_pdf = list(pasta_cnc.glob("*.pdf"))
 
-    for arquivo in arquivos_pdf:
-        with arquivo.open("rb") as f:
-            info = extrair_dados_por_posicao(f)
+for arquivo in arquivos_pdf:
+    with arquivo.open("rb") as f:
+        info = extrair_dados_por_posicao(f)
 
-        if info:
-            cnc = arquivo.stem
-            espessura_fmt = f"{int(round(info['espessura'] * 100)):04d}"
-            grupo = f"{info['proposta']}-{espessura_fmt}-{info['material']}"
+    if info:
+        cnc = arquivo.stem
+        espessura_fmt = f"{int(round(info['espessura'] * 100)):04d}"
+        grupo = f"{info['proposta']}-{espessura_fmt}-{info['material']}"
 
-            inserir_trabalho_pendente({
-                "grupo": grupo,
-                "proposta": info["proposta"],
-                "espessura": info["espessura"],
-                "material": info["material"],
-                "cnc": cnc,
-                "programador": info["programador"],
-                "qtd_chapas": info["qtd_chapas"],
-                "tempo_total": info["tempo_total"],
-                "caminho": info["caminho"],
-                "data_prevista": None,
-                "processos": [],
-                "autorizado": False,
-                "gas": []
-            })
+        inserir_trabalho_pendente({
+            "grupo": grupo,
+            "proposta": info["proposta"],
+            "espessura": info["espessura"],
+            "material": info["material"],
+            "cnc": cnc,
+            "programador": info["programador"],
+            "qtd_chapas": info["qtd_chapas"],
+            "tempo_total": info["tempo_total"],
+            "caminho": info["caminho"],
+            "data_prevista": None,
+            "processos": []
+        })
 
-    print("✅ PDFs processados e inseridos no banco de dados.")
+print("✅ PDFs processados e inseridos no banco de dados.")
