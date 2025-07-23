@@ -244,15 +244,22 @@ for i, maquina in enumerate(MAQUINAS):
                 elementos_drag = []
 
                 for item in fila:
-                    label = (
-                        f"📌 **{item['proposta']}** | CNC `{item['cnc']}` | "
-                        f"{item['material']} | {item['espessura']} mm | "
-                        f"🧾 {item['qtd_chapas']} chapas"
-                    )
-                    if item.get("caminho", "").startswith("http"):
-                        label += f"\n\n![preview]({item['caminho']})"
+                    caminho_img = item.get("caminho", "")
+                    
+                    label = f"""📌 **Proposta:** {item['proposta']}
+                📄 **CNC:** {item['cnc']}
+                🧪 **Material:** {item['material']} | **Espessura:** {item['espessura']} mm
+                📦 **Qtde:** {item['qtd_chapas']} | ⏱️ **Tempo:** {item.get('tempo_total', '')}
+                """
+
+                    # Adiciona imagem se houver
+                    if caminho_img.startswith("http"):
+                        label += f"\n![preview]({caminho_img})"
+
+                    label += "\n---"  # Separador visual
+
                     elementos_drag.append(label)
-                    mapa_itens[label] = item["id"]  # Associa visual → id
+                    mapa_itens[label] = item["id"]
 
                 # Exibe drag-and-drop
                 nova_ordem = sort_items(

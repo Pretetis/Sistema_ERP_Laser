@@ -10,3 +10,4 @@ Pillow
 python-dotenv
 plotly
 streamlit-aggrid==0.2.3
+streamlit-sortables
