@@ -2,7 +2,7 @@ import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 from supabase import create_client, Client
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 # Auto-refresh a cada 100 segundos
 st_autorefresh(interval=100000, key="refresh")
