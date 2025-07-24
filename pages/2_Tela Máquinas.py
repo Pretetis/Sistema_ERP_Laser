@@ -7,19 +7,18 @@ from datetime import datetime, timedelta
 # Auto-refresh a cada 100 segundos
 st_autorefresh(interval=100000, key="refresh")
 
-# Layout da página full screen
 st.set_page_config(layout="wide")
 
-# Conexão Supabase
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# Máquinas e nomes de exibição
+# Escolher turno aqui
+tipo_turno_atual = 2  # 👈 Altere para 1, 2 ou 3
+
 maquinas = [f"LASER {i}" for i in range(1, 7)]
 nomes_exibicao = [f"LASER {i}" for i in range(1, 7)]
 
-# Estilo para texto maior e containers padronizados
 st.markdown("""
     <style>
         .big-text {
@@ -32,9 +31,53 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+def calcular_fim_previsto(inicio: datetime, duracao: timedelta, tipo_turno: int) -> datetime:
+    restante = duracao
+    atual = inicio
+
+    while restante.total_seconds() > 0:
+        if tipo_turno == 1:
+            return atual + restante
+
+        elif tipo_turno == 2:
+            turno_inicio = atual.replace(hour=6, minute=0, second=0, microsecond=0)
+            turno_fim = atual.replace(hour=17, minute=33, second=0, microsecond=0)
+
+        elif tipo_turno == 3:
+            if atual.hour >= 21:
+                turno_inicio = atual.replace(hour=21, minute=0, second=0, microsecond=0)
+                turno_fim = (atual + timedelta(days=1)).replace(hour=15, minute=48, second=0, microsecond=0)
+            elif atual.hour < 15 or (atual.hour == 15 and atual.minute < 48):
+                turno_inicio = atual.replace(hour=21, minute=0, second=0, microsecond=0) - timedelta(days=1)
+                turno_fim = atual.replace(hour=15, minute=48, second=0, microsecond=0)
+            else:
+                atual = atual.replace(hour=21, minute=0, second=0, microsecond=0)
+                continue
+        else:
+            return atual + restante
+
+        if atual < turno_inicio:
+            atual = turno_inicio
+
+        if atual >= turno_fim:
+            atual = turno_inicio + timedelta(days=1)
+            continue
+
+        tempo_disponivel = turno_fim - atual
+        if restante <= tempo_disponivel:
+            return atual + restante
+        else:
+            restante -= tempo_disponivel
+            atual = turno_inicio + timedelta(days=1)
+
+    return atual
+
 # Divide em duas linhas de 3 colunas
 linhas = [maquinas[:3], maquinas[3:]]
 nomes_linhas = [nomes_exibicao[:3], nomes_exibicao[3:]]
+
+# Lista para alimentar a tabela final
+dados_turno = []
 
 for linha_maquinas, linha_nomes in zip(linhas, nomes_linhas):
     cols = st.columns(3)
@@ -47,7 +90,6 @@ for linha_maquinas, linha_nomes in zip(linhas, nomes_linhas):
 
             with st.container(border=True, height=400):
                 if corte_data:
-                    # Obtém o tempo de corte e converte de string para timedelta
                     tempo_str = corte_data.get("tempo_total", "00:00:00")
                     try:
                         h, m, s = map(int, tempo_str.split(":"))
@@ -55,16 +97,24 @@ for linha_maquinas, linha_nomes in zip(linhas, nomes_linhas):
                     except:
                         tempo_duracao = timedelta()
 
-                    # Tenta pegar o horário de início do corte; se não houver, usa agora
                     inicio_str = corte_data.get("inicio")
                     try:
                         inicio = datetime.fromisoformat(inicio_str)
                     except:
                         inicio = datetime.now()
 
-                    # Calcula o horário previsto de término
-                    fim_previsto = inicio + tempo_duracao
-                    fim_previsto_str = fim_previsto.strftime("%H:%M")
+                    fim_previsto = calcular_fim_previsto(inicio, tempo_duracao, tipo_turno_atual)
+                    fim_previsto_str = fim_previsto.strftime("%d/%m %H:%M")
+
+                    # Adiciona aos dados da tabela
+                    dados_turno.append({
+                        "Máquina": maquina,
+                        "Proposta": corte_data.get("proposta"),
+                        "Material": corte_data.get("material"),
+                        "Espessura (mm)": corte_data.get("espessura"),
+                        "Qtd Chapas": corte_data.get("qtd_chapas"),
+                        "Fim Previsto": fim_previsto_str
+                    })
 
                     st.markdown("### 🟢 Cortando agora")
                     st.markdown(
@@ -73,6 +123,16 @@ for linha_maquinas, linha_nomes in zip(linhas, nomes_linhas):
                         f"📦 x{corte_data.get('qtd_chapas')} | ⏱️ Fim Previsto: {fim_previsto_str}</div>",
                         unsafe_allow_html=True
                     )
+                    # Cálculo de progresso
+                    agora = datetime.now()
+                    if tempo_duracao.total_seconds() > 0:
+                        progresso = (agora - inicio).total_seconds() / tempo_duracao.total_seconds()
+                        progresso = max(0, min(progresso, 1))  # Garante valor entre 0 e 1
+                    else:
+                        progresso = 0.0
+
+                    # Barra de progresso
+                    st.progress(progresso, text=f"{int(progresso * 100)}% concluído")
                 else:
                     st.markdown("### 🔴 Nenhum corte em andamento")
 
@@ -84,18 +144,11 @@ for linha_maquinas, linha_nomes in zip(linhas, nomes_linhas):
 
                 if not fila_df.empty:
                     for _, row in fila_df.iterrows():
-                        proposta = row.get('proposta', 'N/D')
-                        material = row.get('material', 'N/D')
-                        espessura = row.get('espessura', 'N/D')
-                        cnc = row.get('cnc', 'N/D')
-                        chapas = row.get('qtd_chapas', 'N/D')
-                        tempo = row.get('tempo_total', 'N/D')
                         st.markdown(
-                            f"<div class='big-text'>- {proposta} | {material} | {espessura} mm | "
-                            f"CNC: {cnc} | x{chapas} | ⏱️ {tempo}</div>",
+                            f"<div class='big-text'>- {row.get('proposta')} | {row.get('material')} | "
+                            f"{row.get('espessura')} mm | CNC: {row.get('cnc')} | x{row.get('qtd_chapas')} | "
+                            f"⏱️ {row.get('tempo_total')}</div>",
                             unsafe_allow_html=True
                         )
                 else:
                     st.markdown("<div class='big-text'>Sem trabalhos na fila.</div>", unsafe_allow_html=True)
-
-                st.markdown('</div>', unsafe_allow_html=True)
