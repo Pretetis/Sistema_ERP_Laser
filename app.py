@@ -188,19 +188,21 @@ for i, maquina in enumerate(MAQUINAS):
 
             with col_fim:
                 if st.button("✅ Finalizar Corte Atual", key=f"fim_{maquina}"):
-                    # 1. Obter os trabalhos que estão em corte na máquina
                     corte_atual = obter_corte_atual(maquina)
 
-                    # 2. Excluir imagens, se existirem
+                    # Garantir que sempre trabalhamos com lista
+                    if not isinstance(corte_atual, list):
+                        corte_atual = [corte_atual]
+
                     for trabalho in corte_atual:
-                        caminho = trabalho.get("caminho")
-                        if caminho:
-                            excluir_imagem_supabase(caminho)
+                        if isinstance(trabalho, dict):
+                            caminho = trabalho.get("caminho")
+                            if caminho:
+                                excluir_imagem_supabase(caminho)
+                        elif isinstance(trabalho, str) and trabalho.startswith("http"):
+                            excluir_imagem_supabase(trabalho)
 
-                    # 3. Finalizar o corte como de costume
                     finalizar_corte(maquina)
-
-                    # 4. Feedback ao usuário
                     st.success("Corte finalizado")
                     st.rerun()
 
