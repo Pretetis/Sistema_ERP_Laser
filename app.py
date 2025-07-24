@@ -21,7 +21,7 @@ st.set_page_config(page_title="Gestão de Corte", layout="wide")
 barra_navegacao()
 st.title("🛠️ Gestão de Produção")
 
-count = st_autorefresh(interval=15000, key="autorefresh")
+count = st_autorefresh(interval = 300000, key="autorefresh")
 
 @st.dialog("Enviar CNC para Máquina")
 def modal_enviar_cnc(item):
