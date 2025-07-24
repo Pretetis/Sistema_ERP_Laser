@@ -118,7 +118,7 @@ for grupo, itens in grupos.items():
         with col_del:
             if st.button("🖑 Excluir Trabalho", key=f"del_{grupo}"):
                 # 1. Obter todos os trabalhos do grupo
-                trabalhos_do_grupo = [t for t in trabalhos if t["grupo"] == grupo]
+                trabalhos_do_grupo = [t for t in trabalho if t["grupo"] == grupo]
 
                 # 2. Excluir imagens (se houver)
                 for trabalho in trabalhos_do_grupo:
@@ -403,5 +403,3 @@ for i, maquina in enumerate(MAQUINAS):
 
         st.divider()
         mostrar_grafico_eventos(maquina)
-dados_debug = supabase.table("trabalhos_pendentes").select("*").limit(1).execute().data
-st.write(dados_debug)
