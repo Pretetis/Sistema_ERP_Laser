@@ -124,14 +124,18 @@ for linha_maquinas, linha_nomes in zip(linhas, nomes_linhas):
                         unsafe_allow_html=True
                     )
                     # Cálculo de progresso
-                    agora = datetime.now()
+                    fuso_brasil = timezone(timedelta(hours=-3))
+                    agora = datetime.now(fuso_brasil)
+
+                    if inicio.tzinfo is None:
+                        inicio = inicio.replace(tzinfo=fuso_brasil)
+
                     if tempo_duracao.total_seconds() > 0:
                         progresso = (agora - inicio).total_seconds() / tempo_duracao.total_seconds()
-                        progresso = max(0, min(progresso, 1))  # Garante valor entre 0 e 1
+                        progresso = max(0, min(progresso, 1))
                     else:
                         progresso = 0.0
 
-                    # Barra de progresso
                     st.progress(progresso, text=f"{int(progresso * 100)}% concluído")
                 else:
                     st.markdown("### 🔴 Nenhum corte em andamento")
