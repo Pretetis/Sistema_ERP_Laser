@@ -70,6 +70,13 @@ st.subheader("🕓 Trabalhos aguardando autorização")
 
 trabalhos = carregar_trabalhos()["aguardando_aprovacao"]
 
+# Inicializa o estado das edições
+for trabalho in trabalhos:
+    for item in trabalho["detalhes"]:
+        tempo_key = f"tempo_edit_{trabalho['grupo']}_{item['cnc']}"
+        if tempo_key not in st.session_state:
+            st.session_state[tempo_key] = False
+
 if not trabalhos:
     st.info("Nenhum trabalho pendente no momento.")
 else:
@@ -78,7 +85,6 @@ else:
             f"🔹 {trabalho['proposta']} | {trabalho['espessura']} mm | {trabalho['material']} "
             f"| x {trabalho['qtd_total']} | ⏱ {trabalho['tempo_total']}"
         ):
-
             data_processo = st.date_input("Data", key=f"data_{trabalho['grupo']}", format="DD/MM/YYYY")
 
             processos_possiveis = ["Dobra", "Usinagem", "Solda", "Gravação", "Galvanização", "Pintura"]
@@ -90,8 +96,8 @@ else:
                 horizontal=True
             )
 
-            # Interpreta "Padrão" como None
             gas_final = None if gas_escolhido == "Padrão" else gas_escolhido
+
             col_processos = st.columns(len(processos_possiveis))
             processos_selecionados = [
                 proc for i, proc in enumerate(processos_possiveis)
@@ -121,7 +127,7 @@ else:
                             segundos = col_s.number_input("Seg", min_value=0, max_value=59, value=0, key=f"s_{trabalho['grupo']}_{item['cnc']}")
                             tempo_editado = f"{int(horas):02d}:{int(minutos):02d}:{int(segundos):02d}"
 
-                            if st.button("Salvar", key=f"salvar_{item['cnc']}"):
+                            if st.button("Salvar Tempo", key=f"salvar_{item['cnc']}"):
                                 atualizar_trabalho_pendente(
                                     cnc=item['cnc'],
                                     grupo=trabalho['grupo'],
@@ -139,9 +145,16 @@ else:
                         else:
                             st.warning("Pré-visualização indisponível.")
 
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button("✅ Autorizar", key=f"auth_{trabalho['grupo']}"):
+            # Botões de autorizar/rejeitar agora dentro de uma form controlada
+            with st.form(key=f"form_aut_{trabalho['grupo']}"):
+                col1, col2 = st.columns(2)
+
+                with col1:
+                    autorizar = st.form_submit_button("✅ Autorizar")
+                with col2:
+                    rejeitar = st.form_submit_button("❌ Rejeitar")
+
+                if autorizar:
                     data_str = str(data_processo)
                     processos_final = processos_selecionados or []
 
@@ -159,9 +172,7 @@ else:
                     st.success(f"Trabalho do grupo {trabalho['grupo']} autorizado.")
                     st.rerun()
 
-            with col2:
-                if st.button("❌ Rejeitar", key=f"rej_{trabalho['grupo']}"):
-                    # 1. Excluir a imagem associada (se houver)
+                if rejeitar:
                     caminho_imagem = trabalho.get("caminho")
                     if caminho_imagem:
                         sucesso = excluir_imagem_supabase(caminho_imagem)
@@ -170,9 +181,6 @@ else:
                         else:
                             st.warning("Falha ao excluir a imagem.")
 
-                    # 2. Excluir o grupo do banco
                     excluir_trabalhos_grupo(trabalho["grupo"])
-
-                    # 3. Mensagem de feedback e atualização da tela
                     st.warning(f"Trabalho do grupo {trabalho['grupo']} rejeitado.")
                     st.rerun()

@@ -270,19 +270,18 @@ def mostrar_grafico_eventos(maquina):
     df = pd.DataFrame(eventos)
     df["timestamp"] = pd.to_datetime(df["timestamp"])
 
-    # Mapeia tipo_evento para status binário
+    # Mapeia os tipos de eventos em status numéricos
     df["status"] = df["tipo_evento"].map({
         "iniciado": 1,
         "retomado": 1,
+        "chapa_finalizada": 1,
         "finalizado": 0,
-        "parado": -1,
         "cancelado": 0,
-        "chapa_finalizada": 1  # mantém máquina ligada enquanto chapas forem finalizadas
-    }).fillna(method='ffill')  # ou .fillna(1) se preferir assumir ligada se evento desconhecido
+        "parado": -1
+    }).fillna(method='ffill')
 
     df = df.sort_values("timestamp")
 
-    # Cria texto de hover (exibe quando o mouse passa por cima)
     df["hover_text"] = df.apply(
         lambda row: f"{row['tipo_evento'].upper()}<br>"
                     f"CNC: {row.get('cnc', '')}<br>"
@@ -291,58 +290,68 @@ def mostrar_grafico_eventos(maquina):
         axis=1
     )
 
+    # Segmenta os dados por mudança de status
+    segments = []
+    current_color = df["status"].iloc[0]
+    current_segment = [df.iloc[0]]
+
+    for i in range(1, len(df)):
+        if df["status"].iloc[i] != current_color:
+            segments.append((current_color, pd.DataFrame(current_segment)))
+            current_color = df["status"].iloc[i]
+            current_segment = [df.iloc[i - 1], df.iloc[i]]
+        else:
+            current_segment.append(df.iloc[i])
+    segments.append((current_color, pd.DataFrame(current_segment)))
+
+    color_map = {
+        -1: "red",
+         0: "yellow",
+         1: "green"
+    }
+
     fig = go.Figure()
 
-    fig.add_trace(go.Scatter(
-        x=df["timestamp"],
-        y=df["status"],
-        mode="lines+markers",
-        line_shape="hv",  # simula step
-        name="Status da máquina",
-        text=df["hover_text"],
-        hoverinfo="text"
-    ))
+    for status_val, segment_df in segments:
+        fig.add_trace(go.Scatter(
+            x=segment_df["timestamp"],
+            y=segment_df["status"],
+            mode="lines+markers",
+            line=dict(color=color_map.get(status_val, "gray"), width=3),
+            marker=dict(size=6),
+            text=segment_df["hover_text"],
+            hoverinfo="text",
+            line_shape="hv",
+            showlegend=False  # 👈 remove da legenda
+        ))
 
-    # (Opcional) Adiciona anotação nos eventos "parado"
     for _, row in df[df["tipo_evento"] == "parado"].iterrows():
         fig.add_annotation(
             x=row["timestamp"],
             y=-1,
             text=row.get("motivo", "Sem motivo"),
             showarrow=True,
-            arrowhead=1,
+            arrowhead=2,
             ax=0,
             ay=-30,
-            bgcolor="#0E1117",
-            font=dict(size=10, color="white")
+            bgcolor="black",
+            font=dict(color="white", size=10)
         )
 
     fig.update_layout(
-        yaxis=dict(
-            tickvals=[-1, 0, 1],
-            ticktext=["Interrupção", "Parado", "Funcionando"],
-            range=[-1.5, 1.5]
-        ),
         title=f"Atividade da Máquina: {maquina}",
         xaxis_title="Horário",
+        yaxis=dict(
+            tickvals=[-1, 0, 1],
+            ticktext=["Interrompido", "Parado", "Funcionando"],
+            range=[-1.5, 1.5]
+        ),
         yaxis_title="Status",
+        showlegend=False,  # 👈 desativa legenda do gráfico
         height=300
     )
 
-    fig.add_trace(go.Scatter(
-        x=df["timestamp"],
-        y=df["status"],
-        mode="lines+markers",
-        line=dict(color="white"),
-        name="Status da máquina",
-        text=df["hover_text"],
-        hoverinfo="text",
-        line_shape="hv"
-    ))
-
-
     st.plotly_chart(fig, use_container_width=True)
-
 
 def trocar_posicao(id1, pos1, id2, pos2):
     # Atualiza id1 para pos2
