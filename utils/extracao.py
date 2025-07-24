@@ -1,38 +1,79 @@
 import fitz  # PyMuPDF
-import tempfile
+from io import BytesIO
+from PIL import Image
 from pathlib import Path
+from datetime import datetime
 
-from utils.supabase import upload_imagem_to_supabase
-from utils.db import inserir_trabalho_pendente
+from utils.supabase import supabase, BUCKET_NAME, SUPABASE_URL
 
-# 🗂️ Pasta onde estão os PDFs
-pasta_cnc = Path("CNC")
 
-def gerar_preview_pdf(pdf_path: Path, nome_saida: str) -> Path:
-    with pdf_path.open("rb") as f:
-        doc = fitz.open(stream=f.read(), filetype="pdf")
-        page = doc.load_page(0)
-        pix = page.get_pixmap(dpi=150)
+def gerar_preview_pdf_em_memoria(pdf_bytes: bytes) -> Image.Image:
+    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+    page = doc.load_page(0)
+    pix = page.get_pixmap(dpi=150)
+    img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+    return img
 
-    temp_img_path = Path(tempfile.gettempdir()) / f"{nome_saida}.png"
-    pix.save(temp_img_path)
-    return temp_img_path
+
+def upload_imagem_memoria_to_supabase(imagem_pil: Image.Image, nome: str, destino: str = "previews") -> str:
+    buffer = BytesIO()
+    imagem_pil.save(buffer, format="PNG")
+    buffer.seek(0)
+
+    destino_final = f"{destino}/{nome}.png"
+    file_bytes = buffer.read()
+
+    storage = supabase.storage.from_(BUCKET_NAME)
+
+    # Verificar se o arquivo já existe no bucket
+    try:
+        storage.download(destino_final)
+        existe = True
+    except Exception:
+        existe = False
+
+    # Se existir, atualiza. Se não, faz upload.
+    if existe:
+        storage.update(
+            path=destino_final,
+            file=file_bytes,
+            file_options={"content-type": "image/png"}
+        )
+    else:
+        storage.upload(
+            path=destino_final,
+            file=file_bytes,
+            file_options={"content-type": "image/png"}
+        )
+
+    return f"{SUPABASE_URL}/storage/v1/object/public/{BUCKET_NAME}/{destino_final}"
+
 
 
 def extrair_dados_por_posicao(arquivo_pdf):
     arquivo_pdf.seek(0)
-    doc = fitz.open(stream=arquivo_pdf, filetype="pdf")
+    pdf_bytes = arquivo_pdf.read()
+
+    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     pagina = doc[0]
     blocos = pagina.get_text("blocks")
 
-    # Salva temporariamente para gerar preview
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
-        tmp_file.write(arquivo_pdf.read())
-        caminho_temp = Path(tmp_file.name)
+    nome_arquivo = f"preview_{datetime.now().strftime('%Y%m%d_%H%M%S')}"  # valor padrão
 
-    nome_saida = caminho_temp.stem
-    preview_path = gerar_preview_pdf(caminho_temp, nome_saida)
-    link_supabase = upload_imagem_to_supabase(preview_path, destino="previews")
+    if hasattr(arquivo_pdf, "name"):
+        try:
+            nome_arquivo_temp = Path(arquivo_pdf.name).stem
+            if nome_arquivo_temp:  # Garante que não é vazio
+                nome_arquivo = nome_arquivo_temp
+        except Exception as e:
+            print(f"Erro ao extrair nome do arquivo: {e}")
+
+    print("Aqui")
+    print(vars(arquivo_pdf))
+
+    # Gerar preview em memória
+    imagem_preview = gerar_preview_pdf_em_memoria(pdf_bytes)
+    link_supabase = upload_imagem_memoria_to_supabase(imagem_preview, nome=nome_arquivo, destino="previews")
 
     arquivo_pdf.seek(0)
 
@@ -69,32 +110,3 @@ def extrair_dados_por_posicao(arquivo_pdf):
         }
     else:
         return None
-
-
-# 🔍 Processa todos os PDFs na pasta CNC e salva no banco
-arquivos_pdf = list(pasta_cnc.glob("*.pdf"))
-
-for arquivo in arquivos_pdf:
-    with arquivo.open("rb") as f:
-        info = extrair_dados_por_posicao(f)
-
-    if info:
-        cnc = arquivo.stem
-        espessura_fmt = f"{int(round(info['espessura'] * 100)):04d}"
-        grupo = f"{info['proposta']}-{espessura_fmt}-{info['material']}"
-
-        inserir_trabalho_pendente({
-            "grupo": grupo,
-            "proposta": info["proposta"],
-            "espessura": info["espessura"],
-            "material": info["material"],
-            "cnc": cnc,
-            "programador": info["programador"],
-            "qtd_chapas": info["qtd_chapas"],
-            "tempo_total": info["tempo_total"],
-            "caminho": info["caminho"],
-            "data_prevista": None,
-            "processos": []
-        })
-
-print("✅ PDFs processados e inseridos no banco de dados.")

@@ -1,5 +1,6 @@
 from supabase import create_client, Client
 from pathlib import Path
+from urllib.parse import urlparse
 import streamlit as st
 import time
 
@@ -46,6 +47,44 @@ def upload_imagem_to_supabase(path_imagem: Path, destino: str = "aguardando_apro
 
     return f"{SUPABASE_URL}/storage/v1/object/public/{BUCKET_NAME}/{destino_final}"
 
+from io import BytesIO
+from PIL import Image
+from datetime import datetime
+
+def upload_imagem_memoria_to_supabase(imagem_pil: Image.Image, nome: str, destino: str = "previews") -> str:
+    buffer = BytesIO()
+    imagem_pil.save(buffer, format="PNG")
+    buffer.seek(0)
+
+    nome_arquivo = f"{nome}.png"
+    destino_final = f"{destino}/{nome_arquivo}"
+
+    supabase.storage.from_(BUCKET_NAME).upload(
+        destino_final,
+        buffer,
+        file_options={"content-type": "image/png"}
+    )
+
+    return f"{SUPABASE_URL}/storage/v1/object/public/{BUCKET_NAME}/{destino_final}"
+
+def excluir_imagem_supabase(link_completo: str) -> bool:
+    try:
+        # Extrai o caminho do objeto dentro do bucket
+        path = urlparse(link_completo).path
+        path_relativo = path.split(f"/{BUCKET_NAME}/")[-1]  # ex: previews/1543.png
+
+        resposta = supabase.storage.from_(BUCKET_NAME).remove([path_relativo])
+        
+        if resposta.get("error"):
+            print("Erro ao excluir:", resposta["error"])
+            return False
+
+        return True
+
+    except Exception as e:
+        print(f"Erro ao tentar excluir imagem: {e}")
+        return False
+    
 # Baixar e salvar no disco
 def baixar_txt_para_disco(nome_arquivo: str, destino: Path) -> bool:
     try:

@@ -1,7 +1,6 @@
 import streamlit as st
 import sys
 from pathlib import Path
-from streamlit_autorefresh import st_autorefresh
 import pandas as pd
 from datetime import date
 
@@ -9,7 +8,7 @@ from utils.extracao import extrair_dados_por_posicao
 from utils.Junta_Trabalhos import carregar_trabalhos
 from utils.navegacao import barra_navegacao
 from utils.db import inserir_trabalho_pendente, atualizar_trabalho_pendente, excluir_trabalhos_grupo
-from utils.supabase import supabase
+from utils.supabase import excluir_imagem_supabase
 
 # Adiciona caminho do projeto para importar corretamente
 sys.path.append(str(Path(__file__).resolve().parent.parent))
@@ -162,6 +161,18 @@ else:
 
             with col2:
                 if st.button("❌ Rejeitar", key=f"rej_{trabalho['grupo']}"):
-                    excluir_trabalhos_grupo(trabalho['grupo'])
+                    # 1. Excluir a imagem associada (se houver)
+                    caminho_imagem = trabalho.get("caminho")
+                    if caminho_imagem:
+                        sucesso = excluir_imagem_supabase(caminho_imagem)
+                        if sucesso:
+                            st.info("Imagem excluída com sucesso.")
+                        else:
+                            st.warning("Falha ao excluir a imagem.")
+
+                    # 2. Excluir o grupo do banco
+                    excluir_trabalhos_grupo(trabalho["grupo"])
+
+                    # 3. Mensagem de feedback e atualização da tela
                     st.warning(f"Trabalho do grupo {trabalho['grupo']} rejeitado.")
                     st.rerun()

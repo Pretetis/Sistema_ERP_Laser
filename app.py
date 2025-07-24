@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from streamlit_sortables import sort_items
-from utils.supabase import supabase
+from utils.supabase import supabase, excluir_imagem_supabase
 
 from utils.db import (
     adicionar_na_fila, obter_fila,
@@ -117,7 +117,19 @@ for grupo, itens in grupos.items():
 
         with col_del:
             if st.button("🖑 Excluir Trabalho", key=f"del_{grupo}"):
+                # 1. Obter todos os trabalhos do grupo
+                trabalhos_do_grupo = [t for t in trabalhos if t["grupo"] == grupo]
+
+                # 2. Excluir imagens (se houver)
+                for trabalho in trabalhos_do_grupo:
+                    caminho = trabalho.get("caminho")
+                    if caminho:
+                        excluir_imagem_supabase(caminho)
+
+                # 3. Excluir os dados do grupo
                 excluir_trabalhos_grupo(grupo)
+
+                # 4. Feedback ao usuário
                 st.success("Trabalho excluído.")
                 st.rerun()
 
@@ -141,7 +153,6 @@ for grupo, itens in grupos.items():
 # =====================
 # Painel Principal - Máquinas
 # =====================
-st.markdown("---")
 cols = st.columns(1)
 
 @st.dialog("Interrupção de Corte")
@@ -167,37 +178,49 @@ for i, maquina in enumerate(MAQUINAS):
         fila = obter_fila(maquina)  # já vem ordenada por 'posicao'
 
         if corte:
-            st.markdown(
-                f"**🔹 Corte Atual:** {corte.get('qtd_chapas', 'N/D')} | CNC {corte.get('cnc', 'N/D')} | "
+            st.subheader(
+                f"**🔹 Corte Atual:** x{corte.get('qtd_chapas', 'N/D')} | CNC {corte.get('cnc', 'N/D')} | "
                 f"{corte.get('material', 'N/D')} | {corte.get('espessura', 'N/D')} mm"
             )
-            col_fim, col_intr, col_ret, col_pend = st.columns(4)
+
+            with st.container(border=True):
+                col_fim, col_intr, col_ret, col_pend = st.columns(4)
 
             with col_fim:
                 if st.button("✅ Finalizar Corte Atual", key=f"fim_{maquina}"):
+                    # 1. Obter os trabalhos que estão em corte na máquina
+                    corte_atual = obter_corte_atual(maquina)
+
+                    # 2. Excluir imagens, se existirem
+                    for trabalho in corte_atual:
+                        caminho = trabalho.get("caminho")
+                        if caminho:
+                            excluir_imagem_supabase(caminho)
+
+                    # 3. Finalizar o corte como de costume
                     finalizar_corte(maquina)
+
+                    # 4. Feedback ao usuário
                     st.success("Corte finalizado")
                     st.rerun()
 
-            with col_intr:
-                if st.button("⏸️ Parar Corte", key=f"parar_{maquina}"):
-                    abrir_dialogo_interrupcao(maquina)
+                with col_intr:
+                    if st.button("⏸️ Parar Corte", key=f"parar_{maquina}"):
+                        abrir_dialogo_interrupcao(maquina)
 
-            with col_ret:
-                if st.button("▶️ Retomar Corte", key=f"retomar_{maquina}"):
-                    retomar_interrupcao(maquina)
-                    st.success("Corte retomado.")
-                    st.rerun()
+                with col_ret:
+                    if st.button("▶️ Retomar Corte", key=f"retomar_{maquina}"):
+                        retomar_interrupcao(maquina)
+                        st.success("Corte retomado.")
+                        st.rerun()
 
-            with col_pend:
-                if st.button("🔁 Retornar para Pendentes", key=f"ret_{maquina}"):
-                    retornar_para_pendentes(maquina)
-                    st.success("Trabalho retornado para pendentes")
-                    st.rerun()
+                with col_pend:
+                    if st.button("🔁 Retornar para Pendentes", key=f"ret_{maquina}"):
+                        retornar_para_pendentes(maquina)
+                        st.success("Trabalho retornado para pendentes")
+                        st.rerun()
         else:
             st.markdown("_Nenhum corte em andamento_")
-
-        st.divider()
 
         if fila:
             aba_visual, aba_ordenacao = st.tabs(["📄 Visualização Completa", "🔃 Ordem de Corte"])
