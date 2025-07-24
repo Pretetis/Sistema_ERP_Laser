@@ -45,32 +45,32 @@ for linha_maquinas, linha_nomes in zip(linhas, nomes_linhas):
             corte = supabase.table("corte_atual").select("*").eq("maquina", maquina).execute()
             corte_data = corte.data[0] if corte.data else None
 
-            # Obtém o tempo de corte e converte de string para timedelta
-            tempo_str = corte_data.get("tempo_total", "00:00:00")
-            try:
-                h, m, s = map(int, tempo_str.split(":"))
-                tempo_duracao = timedelta(hours=h, minutes=m, seconds=s)
-            except:
-                tempo_duracao = timedelta()
-
-            # Tenta pegar o horário de início do corte; se não houver, usa agora
-            inicio_str = corte_data.get("inicio")  # ex: "2025-07-24T08:00:00"
-            try:
-                inicio = datetime.fromisoformat(inicio_str)
-            except:
-                inicio = datetime.now()
-
-            # Calcula o horário previsto de término
-            fim_previsto = inicio + tempo_duracao
-            fim_previsto_str = fim_previsto.strftime("%H:%M")
-
             with st.container(border=True, height=400):
                 if corte_data:
+                    # Obtém o tempo de corte e converte de string para timedelta
+                    tempo_str = corte_data.get("tempo_total", "00:00:00")
+                    try:
+                        h, m, s = map(int, tempo_str.split(":"))
+                        tempo_duracao = timedelta(hours=h, minutes=m, seconds=s)
+                    except:
+                        tempo_duracao = timedelta()
+
+                    # Tenta pegar o horário de início do corte; se não houver, usa agora
+                    inicio_str = corte_data.get("inicio")
+                    try:
+                        inicio = datetime.fromisoformat(inicio_str)
+                    except:
+                        inicio = datetime.now()
+
+                    # Calcula o horário previsto de término
+                    fim_previsto = inicio + tempo_duracao
+                    fim_previsto_str = fim_previsto.strftime("%H:%M")
+
                     st.markdown("### 🟢 Cortando agora")
                     st.markdown(
                         f"<div class='big-text'>📌 {corte_data.get('proposta')} | 📄 CNC: {corte_data.get('cnc')} | "
                         f"🧪 {corte_data.get('material')} | Esp: {corte_data.get('espessura')} mm<br>"
-                        f"📦 x{corte_data.get('qtd_chapas')} | ⏱️ Previsto fim: {fim_previsto_str}</div>",
+                        f"📦 x{corte_data.get('qtd_chapas')} | ⏱️ Fim Previsto: {fim_previsto_str}</div>",
                         unsafe_allow_html=True
                     )
                 else:

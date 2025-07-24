@@ -25,7 +25,7 @@ def adicionar_na_fila(maquina, trabalho):
         "programador": trabalho["programador"],
         "processos": normalizar_processos(trabalho.get("processos")),
         "gas": trabalho.get("gas", None),
-        "data_prevista": trabalho["data_prevista"]
+        "data_prevista": trabalho.get("data_prevista")
     }).execute()
 
 def obter_fila(maquina):

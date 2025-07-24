@@ -38,7 +38,8 @@ def modal_enviar_cnc(item):
             "caminho": item["caminho"],
             "programador": item.get("programador", "DESCONHECIDO"),
             "processos": item.get("processos", []),
-            "gas": item.get("gas", None)
+            "gas": item.get("gas", None),
+            "data_prevista": item["data_prevista"]
         })
 
         # Remove apenas o CNC individual das pendências
