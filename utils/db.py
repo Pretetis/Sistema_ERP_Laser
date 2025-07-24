@@ -3,6 +3,7 @@ from utils.supabase import supabase
 import plotly.graph_objects as go
 import pandas as pd
 import streamlit as st
+import pytz
 
 from datetime import datetime, timedelta
 from pytz import timezone
@@ -42,6 +43,9 @@ def obter_corte_atual(maquina):
 
 
 def iniciar_corte(maquina, id_fila):
+    fuso_sp = pytz.timezone("America/Sao_Paulo")
+    agora = datetime.now(fuso_sp).isoformat()
+
     fila = supabase.table("fila_maquinas").select("*").eq("id", id_fila).execute()
     if not fila.data:
         return
@@ -62,7 +66,8 @@ def iniciar_corte(maquina, id_fila):
         "programador": item["programador"],
         "processos": item.get("processos"),
         "gas": item.get("gas", None),
-        "data_prevista": item["data_prevista"]
+        "data_prevista": item["data_prevista"],
+        "inicio": agora
     }).execute()
 
     registrar_evento(maquina, "iniciado", item["proposta"], item["cnc"])
