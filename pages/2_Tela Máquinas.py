@@ -132,11 +132,12 @@ for linha_maquinas, linha_nomes in zip(linhas, nomes_linhas):
 
                     if tempo_duracao.total_seconds() > 0:
                         progresso = (agora - inicio).total_seconds() / tempo_duracao.total_seconds()
-                        progresso = max(0, min(progresso, 1))
+                        progresso = max(0, min(progresso, 0.9999 if progresso >= 1 else progresso))
                     else:
                         progresso = 0.0
 
-                    st.progress(progresso, text=f"{int(progresso * 100)}% concluído")
+                    texto_barra = "100% concluído" if progresso >= 0.9999 else f"{int(progresso * 100)}% concluído"
+                    st.progress(progresso, text=texto_barra)
                 else:
                     st.markdown("### 🔴 Nenhum corte em andamento")
 
