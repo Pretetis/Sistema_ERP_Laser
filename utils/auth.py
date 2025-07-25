@@ -7,14 +7,13 @@ SUPABASE_URL = st.secrets["SUPABASE_URL"]
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-def cadastrar_usuario(nome, username, email, senha, cargo):
+def cadastrar_usuario(nome, username, senha, cargo):
     try:
         senha_hash = bcrypt.hashpw(senha.encode(), bcrypt.gensalt()).decode('utf-8')
 
         data = {
             "nome": nome,
             "username": username,
-            "email": email,
             "senha_hash": senha_hash,
             "cargo": cargo,
             "aprovado": False  # precisa ser aprovado manualmente

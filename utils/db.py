@@ -11,12 +11,12 @@ from pytz import timezone
 from dateutil import parser
 
 def inserir_trabalho_pendente(dados):
-    usuario = st.session_state.get("usuario", {}).get("username", "desconhecido")
+    usuario = st.session_state.get("usuario", {}).get("nome", "desconhecido")
     dados["modificado_por"] = usuario
     supabase.table("trabalhos_pendentes").insert(dados).execute()
 
 def adicionar_na_fila(maquina, trabalho, modificado_por="desconhecido"):
-    usuario = st.session_state.get("usuario", {}).get("username", "desconhecido")
+    nome = st.session_state.get("usuario", {}).get("nome", "desconhecido")
     supabase.table("fila_maquinas").insert({
         "maquina": maquina,
         "proposta": trabalho["proposta"],
@@ -30,7 +30,7 @@ def adicionar_na_fila(maquina, trabalho, modificado_por="desconhecido"):
         "processos": normalizar_processos(trabalho.get("processos")),
         "gas": trabalho.get("gas", None),
         "data_prevista": trabalho.get("data_prevista"),
-        "modificado_por": usuario
+        "modificado_por": nome,
     }).execute()
 
 def obter_fila(maquina):
@@ -48,7 +48,7 @@ def obter_corte_atual(maquina):
 
 
 def iniciar_corte(maquina, id_fila):
-    usuario = st.session_state.get("usuario", {}).get("username", "desconhecido")
+    nome = st.session_state.get("usuario", {}).get("nome", "desconhecido")
     fuso_sp = pytz.timezone("America/Sao_Paulo")
     agora = datetime.now(fuso_sp).isoformat()
 
@@ -74,12 +74,12 @@ def iniciar_corte(maquina, id_fila):
         "gas": item.get("gas", None),
         "data_prevista": item["data_prevista"],
         "inicio": agora,
-        "modificado_por": usuario
+        "modificado_por": nome,
     }).execute()
 
-    registrar_evento(maquina, "iniciado", item["proposta"], item["cnc"], usuario=usuario)
+    registrar_evento(maquina, "iniciado", item["proposta"], item["cnc"], nome=nome)
 
-def finalizar_corte(maquina, usuario):
+def finalizar_corte(maquina, nome):
     atual = obter_corte_atual(maquina)
     if not atual:
         return
@@ -103,14 +103,14 @@ def finalizar_corte(maquina, usuario):
         supabase.table("corte_atual").update({
             "qtd_chapas": novo_qtd_chapas,
             "tempo_total": novo_tempo_str,
-            "modificado_por": usuario
+            "modificado_por": nome,
         }).eq("maquina", maquina).execute()
 
-        registrar_evento(maquina, "chapa_finalizada", atual["proposta"], atual["cnc"], usuario=usuario)
+        registrar_evento(maquina, "chapa_finalizada", atual["proposta"], atual["cnc"], nome=nome)
 
     else:
         excluir_do_corte(maquina)
-        registrar_evento(maquina, "finalizado", atual["proposta"], atual["cnc"], usuario=usuario)
+        registrar_evento(maquina, "finalizado", atual["proposta"], atual["cnc"], nome=nome)
 
 
 def excluir_da_fila(maquina, id_trabalho):
@@ -149,7 +149,7 @@ def retornar_para_pendentes(maquina):
     registrar_evento(maquina, "cancelado", atual["proposta"], atual["cnc"])
 
 def retornar_item_da_fila_para_pendentes(id_trabalho):
-    usuario = st.session_state.get("usuario", {}).get("username", "desconhecido")
+    nome = st.session_state.get("usuario", {}).get("nome", "desconhecido")
     res = supabase.table("fila_maquinas").select("*").eq("id", id_trabalho).execute()
     if not res.data:
         return
@@ -171,32 +171,32 @@ def retornar_item_da_fila_para_pendentes(id_trabalho):
         "autorizado": True,
         "caminho": item.get("caminho"," "),
         "gas": item.get("gas", None),
-        "modificado_por": usuario
+        "modificado_por": nome,
     }
 
     inserir_trabalho_pendente(novo_trabalho)
-    registrar_evento(item["maquina"], "retornado", item["proposta"], item["cnc"], usuario=usuario)
+    registrar_evento(item["maquina"], "retornado", item["proposta"], item["cnc"], nome=nome)
     excluir_da_fila(item["maquina"], id_trabalho)
 
 
 def atualizar_quantidade(maquina, nova_quantidade):
-    usuario = st.session_state.get("usuario", {}).get("username", "desconhecido")
+    nome = st.session_state.get("usuario", {}).get("nome", "desconhecido")
     supabase.table("corte_atual").update({
         "qtd_chapas": nova_quantidade,
-        "modificado_por": usuario
+        "modificado_por": nome,
     }).eq("maquina", maquina).execute()
 
 
 
 def atualizar_trabalho_pendente(cnc, grupo, tempo_total, data_prevista=None, processos=None, autorizado=False, gas=None):
-    usuario = st.session_state.get("usuario", {}).get("username", "desconhecido")
+    nome = st.session_state.get("usuario", {}).get("nome", "desconhecido")
     update_data = {
         "tempo_total": tempo_total,
         "data_prevista": data_prevista,
         "processos": processos,
         "autorizado": autorizado,
         "gas": gas,
-        "modificado_por": usuario
+        "modificado_por": nome,
     }
 
     # Remove campos nulos para evitar sobrescrita
@@ -209,10 +209,10 @@ def atualizar_trabalho_pendente(cnc, grupo, tempo_total, data_prevista=None, pro
         .execute()
 
 def excluir_trabalhos_grupo(grupo: str):
-    usuario = st.session_state.get("usuario", {}).get("username", "desconhecido")
+    nome = st.session_state.get("usuario", {}).get("nome", "desconhecido")
     supabase.table("log_exclusoes").insert({
         "grupo": grupo,
-        "modificado_por": usuario,
+        "modificado_por": nome,
         "timestamp": datetime.now().isoformat()
     }).execute()
 
@@ -261,9 +261,9 @@ def retomar_interrupcao(maquina):
             tempo_total=str(duracao)
         )
 
-def registrar_evento(maquina, tipo_evento, proposta, cnc, motivo=None, tempo_total=None, usuario=None):
-    if not usuario:
-        usuario = st.session_state.get("usuario", {}).get("username", "desconhecido")
+def registrar_evento(maquina, tipo_evento, proposta, cnc, motivo=None, tempo_total=None, nome=None):
+    if not nome:
+        nome = st.session_state.get("usuario", {}).get("nome", "desconhecido")
     supabase.table("eventos_corte").insert({
         "maquina": maquina,
         "proposta": proposta,
@@ -272,7 +272,7 @@ def registrar_evento(maquina, tipo_evento, proposta, cnc, motivo=None, tempo_tot
         "timestamp": datetime.now().isoformat(),
         "motivo": motivo,
         "tempo_total": tempo_total,
-        "modificado_por": usuario
+        "modificado_por": nome,
     }).execute()
 def obter_eventos_corte(maquina):
     res = supabase.table("eventos_corte")\

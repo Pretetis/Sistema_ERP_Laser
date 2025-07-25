@@ -12,7 +12,7 @@ from utils.db import (
 
 @st.dialog("Interrupção de Corte")
 def abrir_dialogo_interrupcao(maquina):
-    usuario = st.session_state.get("usuario", {}).get("username", "desconhecido")
+    usuario = st.session_state.get("usuario", {}).get("nome", "desconhecido")
     motivo = st.text_area("Motivo da Interrupção", key=f"motivo_{maquina}")
     if st.button("Confirmar Parada", key=f"confirmar_parada_{maquina}"):
         corte = obter_corte_atual(maquina)
@@ -22,7 +22,7 @@ def abrir_dialogo_interrupcao(maquina):
             st.rerun()
 
 def exibir_maquina(maquina, modo="individual"):
-    usuario = st.session_state.get("usuario", {}).get("username", "desconhecido")
+    usuario = st.session_state.get("usuario", {}).get("nome", "desconhecido")
     cargo_usuario = st.session_state.get("usuario", {}).get("cargo", "")
 
     cargo_pcp = cargo_usuario in ["PCP", "Gerente"]
@@ -48,7 +48,8 @@ def exibir_maquina(maquina, modo="individual"):
                     col_fim, col_intr, col_ret, col_pend = st.columns(4)
 
                 with col_fim:
-                    if st.button("✅ Finalizar Corte Atual", key=f"fim_{maquina}"):
+                    key_prefix = f"{modo}_{maquina.replace(' ', '_')}"
+                    if st.button("✅ Finalizar Corte Atual", key=f"fim_{key_prefix}"):
                         corte_atual = obter_corte_atual(maquina)
 
                         # Garantir que sempre trabalhamos com lista
@@ -68,17 +69,20 @@ def exibir_maquina(maquina, modo="individual"):
                         st.rerun()
 
                     with col_intr:
-                        if st.button("⏸️ Parar Corte", key=f"parar_{maquina}"):
+                        key_prefix = f"{modo}_{maquina.replace(' ', '_')}"
+                        if st.button("⏸️ Parar Corte", key=f"parar_{key_prefix}"):
                             abrir_dialogo_interrupcao(maquina)
 
                     with col_ret:
-                        if st.button("▶️ Retomar Corte", key=f"retomar_{maquina}"):
+                        key_prefix = f"{modo}_{maquina.replace(' ', '_')}"
+                        if st.button("▶️ Retomar Corte", key=f"retomar_{key_prefix}"):
                             retomar_interrupcao(maquina)
                             st.success("Corte retomado.")
                             st.rerun()
 
                     with col_pend:
-                        if st.button("🔁 Retornar para Pendentes", key=f"ret_{maquina}"):
+                        key_prefix = f"{modo}_{maquina.replace(' ', '_')}"
+                        if st.button("🔁 Retornar para Pendentes", key=f"ret_{key_prefix}"):
                             retornar_para_pendentes(maquina)
                             st.success("Trabalho retornado para pendentes")
                             st.rerun()
@@ -142,10 +146,12 @@ def exibir_maquina(maquina, modo="individual"):
                     for item in fila
                 }
                 if cargo_operador or cargo_pcp:
-                    escolha = st.selectbox("Escolha o próximo CNC:", list(opcoes.keys()), key=f"escolha_{maquina}")
+                    key_prefix = f"{modo}_{maquina.replace(' ', '_')}"
+                    escolha = st.selectbox("Escolha o próximo CNC:", list(opcoes.keys()), key=f"escolha_{key_prefix}")
                     col_iniciar, col_ret = st.columns(2)
                     with col_iniciar:
-                        if st.button("▶️ Iniciar Corte", key=f"iniciar_{maquina}"):
+                        key_prefix = f"{modo}_{maquina.replace(' ', '_')}"
+                        if st.button("▶️ Iniciar Corte", key=f"iniciar_{key_prefix}"):
                             if corte:
                                 st.warning("Finalize o corte atual antes de iniciar um novo.")
                             else:
@@ -154,7 +160,8 @@ def exibir_maquina(maquina, modo="individual"):
                                 st.rerun()
 
                     with col_ret:
-                        if st.button("🔁 Retornar CNC para Pendentes", key=f"ret_fila_{maquina}"):
+                        key_prefix = f"{modo}_{maquina.replace(' ', '_')}"
+                        if st.button("🔁 Retornar CNC para Pendentes", key=f"ret_fila_{key_prefix}"):
                             retornar_item_da_fila_para_pendentes(opcoes[escolha])
                             st.success("Item da fila retornado para pendentes.")
                             st.rerun()

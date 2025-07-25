@@ -12,7 +12,7 @@ from utils.auxiliares import exibir_maquina
 from streamlit_autorefresh import st_autorefresh
 from collections import defaultdict
 
-usuario = st.session_state.get("usuario", {}).get("username", "desconhecido")
+usuario = st.session_state.get("usuario", {}).get("nome", "desconhecido")
 cargo_usuario = st.session_state.get("usuario", {}).get("cargo", "")
 
 
