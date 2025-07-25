@@ -226,7 +226,7 @@ def exibir_maquina(maquina, modo="individual"):
 
                     with col_sel1:
                         propostas = ["--"] + sorted(set(item["proposta"] for item in fila))
-                        proposta_selecionada = st.selectbox("Proposta", propostas, key=f"sel_proposta_{maquina}")
+                        proposta_selecionada = st.selectbox("Proposta", propostas, key=f"sel_proposta_{modo}_{maquina}")
 
                     with col_sel2:
                         materiais_filtrados = [
@@ -234,7 +234,7 @@ def exibir_maquina(maquina, modo="individual"):
                             if item["proposta"] == proposta_selecionada
                         ] if proposta_selecionada != "--" else []
                         materiais = ["--"] + sorted(set(materiais_filtrados))
-                        material_selecionado = st.selectbox("Material", materiais, key=f"sel_material_{maquina}")
+                        material_selecionado = st.selectbox("Material", materiais, key=f"sel_material_{modo}_{maquina}")
 
                     with col_sel3:
                         espessuras_filtradas = [
@@ -242,7 +242,7 @@ def exibir_maquina(maquina, modo="individual"):
                             if item["proposta"] == proposta_selecionada and item["material"] == material_selecionado
                         ] if proposta_selecionada != "--" and material_selecionado != "--" else []
                         espessuras = ["--"] + sorted(set(espessuras_filtradas))
-                        espessura_selecionada = st.selectbox("Espessura", espessuras, key=f"sel_espessura_{maquina}")
+                        espessura_selecionada = st.selectbox("Espessura", espessuras, key=f"sel_espessura_{modo}_{maquina}")
 
                     with col_salvar:
                         if st.button("💾 Salvar Nova Ordem de Corte", key=f"salvar_ordem_{modo}_{maquina}"):
