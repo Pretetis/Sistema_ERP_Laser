@@ -131,7 +131,7 @@ def exibir_maquina(maquina, modo="individual"):
                 )
 
                 if cargo_empilhadeira:
-                    if st.button(f"💾 Salvar 'Local Separado' - {maquina}"):
+                    if st.button(f"💾 Salvar 'Local Separado' - {maquina}", key=f"btn_salvar_local_{modo}_{maquina}"):
                         for idx, novo_valor in enumerate(edited_df["Local Separado"]):
                             id_item = dados_fila[idx]["ID"]
                             supabase.table("fila_maquinas").update({
@@ -147,11 +147,11 @@ def exibir_maquina(maquina, modo="individual"):
                 }
                 if cargo_operador or cargo_pcp:
                     key_prefix = f"{modo}_{maquina.replace(' ', '_')}"
-                    escolha = st.selectbox("Escolha o próximo CNC:", list(opcoes.keys()), key=f"escolha_{key_prefix}")
+                    escolha = st.selectbox("Escolha o próximo CNC:", list(opcoes.keys()), key=f"escolha_{modo}_{maquina}")
                     col_iniciar, col_ret = st.columns(2)
                     with col_iniciar:
                         key_prefix = f"{modo}_{maquina.replace(' ', '_')}"
-                        if st.button("▶️ Iniciar Corte", key=f"iniciar_{key_prefix}"):
+                        if st.button("▶️ Iniciar Corte", key=f"iniciar_{modo}_{maquina}"):
                             if corte:
                                 st.warning("Finalize o corte atual antes de iniciar um novo.")
                             else:
@@ -161,7 +161,7 @@ def exibir_maquina(maquina, modo="individual"):
 
                     with col_ret:
                         key_prefix = f"{modo}_{maquina.replace(' ', '_')}"
-                        if st.button("🔁 Retornar CNC para Pendentes", key=f"ret_fila_{key_prefix}"):
+                        if st.button("🔁 Retornar CNC para Pendentes", key=f"ret_fila_{modo}_{maquina}"):
                             retornar_item_da_fila_para_pendentes(opcoes[escolha])
                             st.success("Item da fila retornado para pendentes.")
                             st.rerun()
@@ -245,7 +245,7 @@ def exibir_maquina(maquina, modo="individual"):
                         espessura_selecionada = st.selectbox("Espessura", espessuras, key=f"sel_espessura_{maquina}")
 
                     with col_salvar:
-                        if st.button("💾 Salvar Nova Ordem de Corte", key=f"salvar_ordem_{maquina}"):
+                        if st.button("💾 Salvar Nova Ordem de Corte", key=f"salvar_ordem_{modo}_{maquina}"):
                             nova_ordem_ids = [mapa_itens[label] for label in nova_ordem[0]["items"]]
 
                             if (
