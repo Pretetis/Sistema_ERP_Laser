@@ -30,4 +30,4 @@ def barra_navegacao():
     with col1:
         st.page_link("app.py", label="🏭 Gestão de Produção", icon="📋")
     with col2:
-        st.page_link("pages/1_Enviar Programas.py", label="📤 Enviar Programas CNC", icon="📤")
+        st.page_link("pages/1_Gestão de corte.py", label="📤 Enviar Programas CNC", icon="📤")

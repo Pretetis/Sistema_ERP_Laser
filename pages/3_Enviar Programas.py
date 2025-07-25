@@ -4,17 +4,19 @@ from pathlib import Path
 import pandas as pd
 from datetime import date
 
+from utils.auth import verificar_autenticacao
+verificar_autenticacao(roles_permitidos=["Programador", "Gerente"])
+
 from utils.extracao import extrair_dados_por_posicao
 from utils.Junta_Trabalhos import carregar_trabalhos
-from utils.navegacao import barra_navegacao
 from utils.db import inserir_trabalho_pendente, atualizar_trabalho_pendente, excluir_trabalhos_grupo
 from utils.supabase import excluir_imagem_supabase
+
 
 # Adiciona caminho do projeto para importar corretamente
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 st.set_page_config(page_title="Enviar Programas CNC", layout="wide")
 st.title("📤 Enviar Programas CNC")
-barra_navegacao()
 
 st.markdown("""
     <style>
