@@ -28,7 +28,7 @@ def abrir_dialogo_interrupcao(maquina):
             st.rerun()
 
 from utils.db import obter_status_interrompido, atualizar_status_interrompido
-def exibir_maquina(maquina, modo="individual"):
+def exibir_maquina(maquina, modo="individual", dados_corte=None, fila_maquina=None):
     usuario = st.session_state.get("usuario", {}).get("nome", "desconhecido")
     cargo_usuario = st.session_state.get("usuario", {}).get("cargo", "")
 
@@ -41,8 +41,8 @@ def exibir_maquina(maquina, modo="individual"):
     with st.container(border=True):
         st.markdown(f"## 🔧 {maquina}")
 
-        corte = obter_corte_atual(maquina)
-        fila = obter_fila(maquina)  # já vem ordenada por 'posicao'
+        corte = dados_corte if dados_corte is not None else obter_corte_atual(maquina)
+        fila = fila_maquina if fila_maquina is not None else obter_fila(maquina)
 
         if corte:
             st.subheader(

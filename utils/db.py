@@ -33,6 +33,7 @@ def adicionar_na_fila(maquina, trabalho, modificado_por="desconhecido"):
         "modificado_por": nome,
     }).execute()
 
+@st.cache_data(ttl=30)
 def obter_fila(maquina):
     res = supabase.table("fila_maquinas")\
         .select("*")\
@@ -51,6 +52,7 @@ def cnc_ja_existe(cnc: str) -> bool:
 def excluir_trabalho_por_cnc(cnc: str):
     supabase.table("trabalhos_pendentes").delete().eq("cnc", cnc).execute()
 
+@st.cache_data(ttl=30)
 def obter_corte_atual(maquina):
     res = supabase.table("corte_atual").select("*").eq("maquina", maquina).execute()
     return res.data[0] if res.data else None
@@ -406,3 +408,16 @@ def obter_status_interrompido(maquina: str):
 
 def atualizar_status_interrompido(maquina: str, interrompido: bool):
     supabase.table("corte_atual").update({"interrompido": interrompido}).eq("maquina", maquina).execute()
+
+@st.cache_data(ttl=30)
+def obter_todos_cortes_atuais():
+    res = supabase.table("corte_atual").select("*").execute()
+    return {r["maquina"]: r for r in res.data} if res.data else {}
+
+@st.cache_data(ttl=30)
+def obter_todas_filas():
+    res = supabase.table("fila_maquinas").select("*").order("posicao").execute()
+    filas = {}
+    for item in res.data or []:
+        filas.setdefault(item["maquina"], []).append(item)
+    return filas

@@ -1,4 +1,5 @@
 import pandas as pd
+import streamlit as st
 from utils.supabase import supabase
 
 PREFIXOS_CATEGORIAS = {
@@ -6,6 +7,7 @@ PREFIXOS_CATEGORIAS = {
     "trabalhos_pendentes": "trabalhos_pendentes"
 }
 
+@st.cache_data(ttl=30)
 def carregar_trabalhos():
     trabalhos = {
         "aguardando_aprovacao": [],
