@@ -72,13 +72,6 @@ st.subheader("🕓 Trabalhos aguardando autorização")
 
 trabalhos = carregar_trabalhos()["aguardando_aprovacao"]
 
-# Inicializa o estado das edições
-for trabalho in trabalhos:
-    for item in trabalho["detalhes"]:
-        tempo_key = f"tempo_edit_{trabalho['grupo']}_{item['cnc']}"
-        if tempo_key not in st.session_state:
-            st.session_state[tempo_key] = False
-
 if not trabalhos:
     st.info("Nenhum trabalho pendente no momento.")
 else:
@@ -119,8 +112,10 @@ else:
                         tempo_key = f"tempo_edit_{trabalho['grupo']}_{item['cnc']}"
                         editar_key = f"editar_tempo_{trabalho['grupo']}_{item['cnc']}"
 
-                        if st.button("Editar Tempo", key=editar_key):
-                            st.session_state[tempo_key] = True
+                        if tempo_key not in st.session_state:
+                            st.session_state[tempo_key] = False
+
+                        st.session_state[tempo_key] = st.toggle("Editar Tempo", key=editar_key, value=st.session_state[tempo_key])
 
                         if st.session_state.get(tempo_key, False):
                             col_h, col_m, col_s = st.columns(3)

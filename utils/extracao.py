@@ -68,9 +68,6 @@ def extrair_dados_por_posicao(arquivo_pdf):
         except Exception as e:
             print(f"Erro ao extrair nome do arquivo: {e}")
 
-    print("Aqui")
-    print(vars(arquivo_pdf))
-
     # Gerar preview em memória
     imagem_preview = gerar_preview_pdf_em_memoria(pdf_bytes)
     link_supabase = upload_imagem_memoria_to_supabase(imagem_preview, nome=nome_arquivo, destino="previews")
