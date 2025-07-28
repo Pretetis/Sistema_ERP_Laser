@@ -231,6 +231,7 @@ def normalizar_processos(val):
     return ["Corte Retornado"]
 
 def retomar_interrupcao(maquina):
+    nome = st.session_state.get("usuario", {}).get("nome", "desconhecido")
     res = supabase.table("eventos_corte")\
         .select("*")\
         .eq("maquina", maquina)\
@@ -258,7 +259,8 @@ def retomar_interrupcao(maquina):
             "retomado",
             parada["proposta"],
             parada["cnc"],
-            tempo_total=str(duracao)
+            tempo_total=str(duracao),
+            nome = nome
         )
 
 def registrar_evento(maquina, tipo_evento, proposta, cnc, motivo=None, tempo_total=None, nome=None):

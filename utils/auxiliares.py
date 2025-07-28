@@ -12,12 +12,12 @@ from utils.db import (
 
 @st.dialog("Interrupção de Corte")
 def abrir_dialogo_interrupcao(maquina):
-    usuario = st.session_state.get("usuario", {}).get("nome", "desconhecido")
+    nome = st.session_state.get("usuario", {}).get("nome", "desconhecido")
     motivo = st.text_area("Motivo da Interrupção", key=f"motivo_{maquina}")
     if st.button("Confirmar Parada", key=f"confirmar_parada_{maquina}"):
         corte = obter_corte_atual(maquina)
         if corte:
-            registrar_evento(maquina, "parado", corte["proposta"], corte["cnc"], motivo=motivo, usuario=usuario)
+            registrar_evento(maquina, "parado", corte["proposta"], corte["cnc"], motivo=motivo, nome=nome)
             st.success("Interrupção registrada.")
             st.rerun()
 
