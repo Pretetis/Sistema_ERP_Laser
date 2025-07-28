@@ -398,3 +398,11 @@ def mostrar_grafico_eventos(maquina, modo="individual"):
         use_container_width=True,
         key=f"grafico_{maquina}_{uuid.uuid4()}"
     )
+
+def obter_status_interrompido(maquina: str):
+    result = supabase.table("corte_atual").select("interrompido").eq("maquina", maquina).execute()
+    data = result.data
+    return data[0]["interrompido"] if data else False
+
+def atualizar_status_interrompido(maquina: str, interrompido: bool):
+    supabase.table("corte_atual").update({"interrompido": interrompido}).eq("maquina", maquina).execute()

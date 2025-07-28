@@ -22,9 +22,12 @@ def abrir_dialogo_interrupcao(maquina):
         corte = obter_corte_atual(maquina)
         if corte:
             registrar_evento(maquina, "parado", corte["proposta"], corte["cnc"], motivo=motivo, nome=nome)
+            atualizar_status_interrompido(maquina, True)  # atualiza status real
+            st.session_state[f"abrir_dialogo_{maquina}"] = False  # FECHA o diálogo
             st.success("Interrupção registrada.")
             st.rerun()
 
+from utils.db import obter_status_interrompido, atualizar_status_interrompido
 def exibir_maquina(maquina, modo="individual"):
     usuario = st.session_state.get("usuario", {}).get("nome", "desconhecido")
     cargo_usuario = st.session_state.get("usuario", {}).get("cargo", "")
@@ -48,48 +51,53 @@ def exibir_maquina(maquina, modo="individual"):
             )
 
             if cargo_operador or cargo_pcp:
+                interrompido = obter_status_interrompido(maquina)
+
                 with st.container(border=True):
                     col_fim, col_intr, col_ret, col_pend = st.columns(4)
 
-                with col_fim:
-                    key_prefix = f"{modo}_{maquina.replace(' ', '_')}"
-                    if st.button("✅ Finalizar Corte Atual", key=f"fim_{key_prefix}"):
-                        corte_atual = obter_corte_atual(maquina)
+                if not interrompido:
+                    with col_fim:
+                        key_prefix = f"{modo}_{maquina.replace(' ', '_')}"
+                        if st.button("✅ Finalizar Corte Atual", key=f"fim_{key_prefix}"):
+                            corte_atual = obter_corte_atual(maquina)
+                            if not isinstance(corte_atual, list):
+                                corte_atual = [corte_atual]
 
-                        # Garantir que sempre trabalhamos com lista
-                        if not isinstance(corte_atual, list):
-                            corte_atual = [corte_atual]
+                            for trabalho in corte_atual:
+                                if isinstance(trabalho, dict):
+                                    caminho = trabalho.get("caminho")
+                                    if caminho:
+                                        excluir_imagem_supabase(caminho)
+                                elif isinstance(trabalho, str) and trabalho.startswith("http"):
+                                    excluir_imagem_supabase(trabalho)
 
-                        for trabalho in corte_atual:
-                            if isinstance(trabalho, dict):
-                                caminho = trabalho.get("caminho")
-                                if caminho:
-                                    excluir_imagem_supabase(caminho)
-                            elif isinstance(trabalho, str) and trabalho.startswith("http"):
-                                excluir_imagem_supabase(trabalho)
-
-                        finalizar_corte(maquina, usuario)
-                        st.success("Corte finalizado")
-                        st.rerun()
+                            finalizar_corte(maquina, usuario)
+                            st.success("Corte finalizado")
+                            st.rerun()
 
                     with col_intr:
                         key_prefix = f"{modo}_{maquina.replace(' ', '_')}"
                         if st.button("⏸️ Parar Corte", key=f"parar_{key_prefix}"):
+                            st.session_state[f"abrir_dialogo_{maquina}"] = True
+                        if st.session_state.get(f"abrir_dialogo_{maquina}"):
                             abrir_dialogo_interrupcao(maquina)
 
+                else:
                     with col_ret:
                         key_prefix = f"{modo}_{maquina.replace(' ', '_')}"
                         if st.button("▶️ Retomar Corte", key=f"retomar_{key_prefix}"):
                             retomar_interrupcao(maquina)
+                            atualizar_status_interrompido(maquina, False)
                             st.success("Corte retomado.")
                             st.rerun()
 
-                    with col_pend:
-                        key_prefix = f"{modo}_{maquina.replace(' ', '_')}"
-                        if st.button("🔁 Retornar para Pendentes", key=f"ret_{key_prefix}"):
-                            retornar_para_pendentes(maquina)
-                            st.success("Trabalho retornado para pendentes")
-                            st.rerun()
+                with col_pend:
+                    key_prefix = f"{modo}_{maquina.replace(' ', '_')}"
+                    if st.button("🔁 Retornar para Pendentes", key=f"ret_{key_prefix}"):
+                        retornar_para_pendentes(maquina)
+                        st.success("Trabalho retornado para pendentes")
+                        st.rerun()
         else:
             st.markdown("_Nenhum corte em andamento_")
 
