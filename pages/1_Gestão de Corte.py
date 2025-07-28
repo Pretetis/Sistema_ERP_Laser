@@ -168,24 +168,12 @@ for grupo, itens in grupos.items():
 # =====================
 from utils.db import obter_todos_cortes_atuais, obter_todas_filas, obter_corte_atual, obter_fila
 
-abas = ["🧩 Geral"] + [f"🔧 {m}" for m in MAQUINAS]
+abas = [f"🔧 {m}" for m in MAQUINAS]
 abas_componentes = st.tabs(abas)
 
-for idx, aba in enumerate(abas):
+for idx, maquina in enumerate(MAQUINAS):
     with abas_componentes[idx]:
-        if idx == 0:
-            # Aba Geral – carrega tudo de uma vez
-            todos_cortes = obter_todos_cortes_atuais()
-            todas_filas = obter_todas_filas()
-
-            for maquina in MAQUINAS:
-                exibir_maquina(maquina, modo="geral",
-                               dados_corte=todos_cortes.get(maquina),
-                               fila_maquina=todas_filas.get(maquina, []))
-        else:
-            # Apenas essa máquina individual
-            maquina = MAQUINAS[idx - 1]  # porque "Geral" está na posição 0
-            corte = obter_corte_atual(maquina)
-            fila = obter_fila(maquina)
-            exibir_maquina(maquina, modo="individual",
-                           dados_corte=corte, fila_maquina=fila)
+        corte = obter_corte_atual(maquina)
+        fila = obter_fila(maquina)
+        exibir_maquina(maquina, modo="individual",
+                       dados_corte=corte, fila_maquina=fila)
