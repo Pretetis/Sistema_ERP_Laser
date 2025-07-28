@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
 from streamlit_sortables import sort_items
+from datetime import date
+from pathlib import Path
 
 from utils.supabase import supabase, excluir_imagem_supabase
 from utils.db import (
@@ -9,6 +11,8 @@ from utils.db import (
     retornar_para_pendentes, retomar_interrupcao,
     retornar_item_da_fila_para_pendentes
 )
+from utils.db import inserir_trabalho_pendente, atualizar_trabalho_pendente, excluir_trabalhos_grupo
+from utils.extracao import extrair_dados_por_posicao
 
 @st.dialog("Interrupção de Corte")
 def abrir_dialogo_interrupcao(maquina):
@@ -279,3 +283,28 @@ def exibir_maquina(maquina, modo="individual"):
 
         st.divider()
         mostrar_grafico_eventos(maquina)
+
+def processar_pdfs(pdfs):
+    for pdf in pdfs:
+        info = extrair_dados_por_posicao(pdf)
+        if info:
+            cnc = Path(pdf.name).stem
+            tempo_td = pd.to_timedelta(info["tempo_total"]) if isinstance(info["tempo_total"], str) else info["tempo_total"]
+            total_segundos = int(tempo_td.total_seconds())
+            tempo_formatado = f"{total_segundos // 3600:02}:{(total_segundos % 3600) // 60:02}:{total_segundos % 60:02}"
+
+            inserir_trabalho_pendente({
+                "grupo": f"{info['proposta']}-{int(round(info['espessura']*100)):04d}-{info['material']}",
+                "proposta": info["proposta"],
+                "espessura": info["espessura"],
+                "material": info["material"],
+                "cnc": cnc,
+                "programador": info["programador"],
+                "qtd_chapas": info["qtd_chapas"],
+                "tempo_total": tempo_formatado,
+                "caminho": info["caminho"],
+                "data_prevista": date.today().isoformat(),
+                "processos": [],
+                "autorizado": False,
+                "gas": []
+            })

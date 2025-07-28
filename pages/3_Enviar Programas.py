@@ -1,5 +1,6 @@
 import streamlit as st
 import sys
+import gc
 from pathlib import Path
 import pandas as pd
 from datetime import date
@@ -11,6 +12,7 @@ from utils.extracao import extrair_dados_por_posicao
 from utils.Junta_Trabalhos import carregar_trabalhos
 from utils.db import inserir_trabalho_pendente, atualizar_trabalho_pendente, excluir_trabalhos_grupo
 from utils.supabase import excluir_imagem_supabase
+from utils.auxiliares import processar_pdfs
 
 
 # Adiciona caminho do projeto para importar corretamente
@@ -30,39 +32,30 @@ st.markdown("""
 # 1. Upload dos PDFs
 # =====================
 st.markdown("Faça o upload dos arquivos .pdf dos programas CNC.")
-pdfs = st.file_uploader("Selecione os arquivos PDF", type="pdf", accept_multiple_files=True)
+# Inicializa a flag no primeiro carregamento
+if "limpar_upload" not in st.session_state:
+    st.session_state["limpar_upload"] = False
 
-from pathlib import Path
-import pandas as pd  # se ainda não importou
+# Troca a chave do uploader com base na flag
+uploader_key = "uploader_reset" if st.session_state.limpar_upload else "uploader"
+
+pdfs = st.file_uploader("Envie os PDFs", type="pdf", accept_multiple_files=True, key=uploader_key)
 
 if st.button("🗕️ Processar PDFs"):
-    for pdf in pdfs:
-        info = extrair_dados_por_posicao(pdf)
-        if info:
-            cnc = Path(pdf.name).stem  # Remove .pdf
-            
-            # Se tempo_total é string, converte para timedelta
-            tempo_td = pd.to_timedelta(info["tempo_total"]) if isinstance(info["tempo_total"], str) else info["tempo_total"]
-            
-            total_segundos = int(tempo_td.total_seconds())
-            tempo_formatado = f"{total_segundos // 3600:02}:{(total_segundos % 3600) // 60:02}:{total_segundos % 60:02}"
-            
-            inserir_trabalho_pendente({
-                "grupo": f"{info['proposta']}-{int(round(info['espessura']*100)):04d}-{info['material']}",
-                "proposta": info["proposta"],
-                "espessura": info["espessura"],
-                "material": info["material"],
-                "cnc": cnc,
-                "programador": info["programador"],
-                "qtd_chapas": info["qtd_chapas"],
-                "tempo_total": tempo_formatado,  # tempo formatado no padrão HH:MM:SS
-                "caminho": info["caminho"],
-                "data_prevista": date.today().isoformat(),
-                "processos": [],
-                "autorizado": False,
-                "gas": []
-            })
-    st.success("PDFs processados e registrados no banco de dados!")
+    if pdfs:
+        processar_pdfs(pdfs)
+        
+        # Força o reset do uploader na próxima renderização
+        st.session_state.limpar_upload = not st.session_state.limpar_upload
+        
+        # Limpa variáveis temporárias
+        del pdfs
+        gc.collect()
+        
+        st.success("PDFs processados e registrados no banco de dados!")
+        st.rerun()
+    else:
+        st.warning("Nenhum PDF enviado.")
 
 # =====================
 # 2. Trabalhos pendentes agrupados
