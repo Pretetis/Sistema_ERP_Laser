@@ -29,6 +29,9 @@ def abrir_dialogo_interrupcao(maquina):
 
 from utils.db import obter_status_interrompido, atualizar_status_interrompido
 def exibir_maquina(maquina, modo="individual", dados_corte=None, fila_maquina=None):
+    if st.session_state.get(f"status_corte_finalizado_{maquina}"):
+        st.success("Corte finalizado com sucesso!")
+        st.session_state[f"status_corte_finalizado_{maquina}"] = False
     usuario = st.session_state.get("usuario", {}).get("nome", "desconhecido")
     cargo_usuario = st.session_state.get("usuario", {}).get("cargo", "")
 
@@ -74,12 +77,14 @@ def exibir_maquina(maquina, modo="individual", dados_corte=None, fila_maquina=No
 
                             finalizar_corte(maquina, usuario)
                             st.success("Corte finalizado")
-                            st.rerun()
+                            st.cache_data.clear()
+                            st.session_state[f"status_corte_finalizado_{maquina}"] = True
 
                     with col_intr:
                         key_prefix = f"{modo}_{maquina.replace(' ', '_')}"
                         if st.button("⏸️ Parar Corte", key=f"parar_{key_prefix}"):
                             st.session_state[f"abrir_dialogo_{maquina}"] = True
+                            st.cache_data.clear()
                         if st.session_state.get(f"abrir_dialogo_{maquina}"):
                             abrir_dialogo_interrupcao(maquina)
 
@@ -90,6 +95,7 @@ def exibir_maquina(maquina, modo="individual", dados_corte=None, fila_maquina=No
                             retomar_interrupcao(maquina)
                             atualizar_status_interrompido(maquina, False)
                             st.success("Corte retomado.")
+                            st.cache_data.clear()
                             st.rerun()
 
                 with col_pend:
@@ -97,6 +103,7 @@ def exibir_maquina(maquina, modo="individual", dados_corte=None, fila_maquina=No
                     if st.button("🔁 Retornar para Pendentes", key=f"ret_{key_prefix}"):
                         retornar_para_pendentes(maquina)
                         st.success("Trabalho retornado para pendentes")
+                        st.cache_data.clear()
                         st.rerun()
         else:
             st.markdown("_Nenhum corte em andamento_")
@@ -129,6 +136,9 @@ def exibir_maquina(maquina, modo="individual", dados_corte=None, fila_maquina=No
                     "Caminho": st.column_config.ImageColumn(),
                     "Local Separado": st.column_config.TextColumn(disabled=not cargo_empilhadeira)
                 }
+                if st.session_state.get(f"status_salvo_local_{maquina}"):
+                    st.success("Local separado salvo com sucesso.")
+                    st.session_state[f"status_salvo_local_{maquina}"] = False
 
                 for col in df_visual.columns:
                     if col not in ["Local Separado", "Caminho"]:
@@ -151,7 +161,7 @@ def exibir_maquina(maquina, modo="individual", dados_corte=None, fila_maquina=No
                                     "modificado_por": usuario
                                 }).eq("id", id_item).execute()
                         st.success("Campos salvos com sucesso.")
-                        st.rerun()
+                        st.session_state[f"status_salvo_local_{maquina}"] = True
 
                 opcoes = {
                     f"{item['proposta']} | CNC {item['cnc']}": item['id']
@@ -164,6 +174,7 @@ def exibir_maquina(maquina, modo="individual", dados_corte=None, fila_maquina=No
                     with col_iniciar:
                         key_prefix = f"{modo}_{maquina.replace(' ', '_')}"
                         if st.button("▶️ Iniciar Corte", key=f"iniciar_{modo}_{maquina}"):
+                            st.cache_data.clear()
                             if corte:
                                 st.warning("Finalize o corte atual antes de iniciar um novo.")
                             else:
@@ -176,6 +187,7 @@ def exibir_maquina(maquina, modo="individual", dados_corte=None, fila_maquina=No
                         if st.button("🔁 Retornar CNC para Pendentes", key=f"ret_fila_{modo}_{maquina}"):
                             retornar_item_da_fila_para_pendentes(opcoes[escolha])
                             st.success("Item da fila retornado para pendentes.")
+                            st.cache_data.clear()
                             st.rerun()
             with aba_ordenacao:
                 st.markdown("### 🔃 Ordem de Corte")
@@ -290,7 +302,8 @@ def exibir_maquina(maquina, modo="individual", dados_corte=None, fila_maquina=No
             st.markdown("_Fila vazia_")
 
         st.divider()
-        mostrar_grafico_eventos(maquina)
+        with st.expander("Gerar Gráfico da Máquina"):
+            mostrar_grafico_eventos(maquina)
 
 from utils.db import cnc_ja_existe, excluir_trabalho_por_cnc
 

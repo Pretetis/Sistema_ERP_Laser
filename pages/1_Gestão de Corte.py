@@ -79,6 +79,10 @@ for t in trabalhos_raw:
     grupos[t["grupo"]].append(t)
 
 for grupo, itens in grupos.items():
+    if st.session_state.get("status_envio_grupo") == grupo:
+        st.success(f"Grupo {grupo} enviado com sucesso!")
+        st.session_state["status_envio_grupo"] = None
+        continue  # pula renderizar este grupo pois ele já foi processado
     trabalho = itens[0]
     # Primeira linha do título
     titulo_linha1 = (
@@ -103,6 +107,7 @@ for grupo, itens in grupos.items():
             col_add, col_del = st.columns(2)
             with col_add:
                 if st.button("➕ Enviar todos para a máquina", key=f"btn_add_todos_{grupo}"):
+                    ids_para_deletar = []
                     for item in itens:
                         adicionar_na_fila(maquina_escolhida, {
                             "proposta": item["proposta"],
@@ -117,16 +122,10 @@ for grupo, itens in grupos.items():
                             "gas": item.get("gas", None),
                             "data_prevista": item["data_prevista"]
                         }, usuario)
+                        ids_para_deletar.append(item["id"])
 
-                        # Remover cada item individualmente das pendências
-                        supabase.table("trabalhos_pendentes") \
-                            .delete() \
-                            .eq("id", item["id"]) \
-                            .execute()
-
-                    st.success(f"Todos os CNCs enviados para {maquina_escolhida}")
-                    st.rerun()
-
+                    supabase.table("trabalhos_pendentes").delete().in_("id", ids_para_deletar).execute()
+                    st.session_state["status_envio_grupo"] = grupo  # Marca que esse grupo foi enviado
             with col_del:
                 if st.button("🖑 Excluir Trabalho", key=f"del_{grupo}"):
                     # 1. Obter todos os trabalhos do grupo

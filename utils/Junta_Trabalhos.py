@@ -7,7 +7,6 @@ PREFIXOS_CATEGORIAS = {
     "trabalhos_pendentes": "trabalhos_pendentes"
 }
 
-@st.cache_data(ttl=30)
 def carregar_trabalhos():
     trabalhos = {
         "aguardando_aprovacao": [],
