@@ -289,12 +289,16 @@ def registrar_evento(maquina, tipo_evento, proposta, cnc, motivo=None, tempo_tot
         "modificado_por": nome,
     }).execute()
 def obter_eventos_corte(maquina):
-    res = supabase.table("eventos_corte")\
-        .select("*")\
-        .eq("maquina", maquina)\
-        .order("timestamp", desc=False)\
-        .execute()
-    return res.data
+    try:
+        res = supabase.table("eventos_corte")\
+            .select("*")\
+            .eq("maquina", maquina)\
+            .order("timestamp", desc=False)\
+            .execute()
+        return res.data
+    except Exception as e:
+        st.error(f"Erro ao obter eventos da máquina {maquina}: {e}")
+        return []
 
 def mostrar_grafico_eventos(maquina, modo="individual"):
     eventos = obter_eventos_corte(maquina)
