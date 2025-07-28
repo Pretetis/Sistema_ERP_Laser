@@ -8,11 +8,10 @@ from datetime import date
 from utils.auth import verificar_autenticacao
 verificar_autenticacao(roles_permitidos=["Programador", "Gerente"])
 
-from utils.extracao import extrair_dados_por_posicao
 from utils.Junta_Trabalhos import carregar_trabalhos
-from utils.db import inserir_trabalho_pendente, atualizar_trabalho_pendente, excluir_trabalhos_grupo
+from utils.db import inserir_trabalho_pendente, atualizar_trabalho_pendente, excluir_trabalhos_grupo, excluir_trabalho_por_cnc
 from utils.supabase import excluir_imagem_supabase
-from utils.auxiliares import processar_pdfs
+from utils.auxiliares import processar_pdfs, confirmar_substituicao_cnc
 
 
 # Adiciona caminho do projeto para importar corretamente
@@ -40,20 +39,32 @@ if "limpar_upload" not in st.session_state:
 uploader_key = "uploader_reset" if st.session_state.limpar_upload else "uploader"
 
 pdfs = st.file_uploader("Envie os PDFs", type="pdf", accept_multiple_files=True, key=uploader_key)
+# Verifica se há CNCs aguardando confirmação
+if "cnc_para_confirmar" in st.session_state:
+    for dados in st.session_state["cnc_para_confirmar"]:
+        confirmar_substituicao_cnc(dados)
+    # Zera para evitar duplicação em loop
+    st.session_state["cnc_para_confirmar"] = []
+
 
 if st.button("🗕️ Processar PDFs"):
     if pdfs:
         processar_pdfs(pdfs)
-        
-        # Força o reset do uploader na próxima renderização
-        st.session_state.limpar_upload = not st.session_state.limpar_upload
-        
-        # Limpa variáveis temporárias
-        del pdfs
-        gc.collect()
-        
-        st.success("PDFs processados e registrados no banco de dados!")
-        st.rerun()
+
+        if "cnc_para_confirmar" in st.session_state and st.session_state["cnc_para_confirmar"]:
+            # CNCs duplicados — exibir diálogo, não reiniciar ainda
+            st.toast("Existem CNCs duplicados aguardando confirmação.")
+            st.rerun()
+        else:
+            # Força o reset do uploader na próxima renderização
+            st.session_state.limpar_upload = not st.session_state.limpar_upload
+
+            # Limpa variáveis temporárias
+            del pdfs
+            gc.collect()
+
+            st.success("PDFs processados e registrados no banco de dados!")
+            st.rerun()
     else:
         st.warning("Nenhum PDF enviado.")
 

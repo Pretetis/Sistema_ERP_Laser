@@ -41,6 +41,15 @@ def obter_fila(maquina):
         .execute()
     return res.data if res.data else []
 
+def cnc_ja_existe(cnc: str) -> bool:
+    res = supabase.table("trabalhos_pendentes")\
+        .select("cnc")\
+        .eq("cnc", cnc)\
+        .execute()
+    return len(res.data) > 0
+
+def excluir_trabalho_por_cnc(cnc: str):
+    supabase.table("trabalhos_pendentes").delete().eq("cnc", cnc).execute()
 
 def obter_corte_atual(maquina):
     res = supabase.table("corte_atual").select("*").eq("maquina", maquina).execute()

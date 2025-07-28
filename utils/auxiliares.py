@@ -284,27 +284,65 @@ def exibir_maquina(maquina, modo="individual"):
         st.divider()
         mostrar_grafico_eventos(maquina)
 
+from utils.db import cnc_ja_existe, excluir_trabalho_por_cnc
+
+@st.dialog("Substituir CNC Existente")
+def confirmar_substituicao_cnc(dados_trabalho):
+    cnc = dados_trabalho["cnc"]
+    st.warning(f"O CNC '{cnc}' já está cadastrado. Deseja substituí-lo?")
+    
+    with st.container(border=True):
+        st.write(f"**Proposta:** {dados_trabalho['proposta']}")
+        st.write(f"**Material:** {dados_trabalho['material']}")
+        st.write(f"**Espessura:** {dados_trabalho['espessura']} mm")
+        st.write(f"**Qtd Chapas:** {dados_trabalho['qtd_chapas']}")
+        st.write(f"**Tempo Total:** {dados_trabalho['tempo_total']}")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("✅ Confirmar Substituição", key=f"confirmar_sub_{cnc}"):
+            excluir_trabalho_por_cnc(cnc)
+            inserir_trabalho_pendente(dados_trabalho)
+            st.success(f"CNC '{cnc}' substituído com sucesso!")
+            st.rerun()
+    with col2:
+        if st.button("❌ Cancelar", key=f"cancelar_sub_{cnc}"):
+            st.info("Substituição cancelada.")
+            st.rerun()
+
+
 def processar_pdfs(pdfs):
+    if "cnc_para_confirmar" not in st.session_state:
+        st.session_state["cnc_para_confirmar"] = []
+
     for pdf in pdfs:
         info = extrair_dados_por_posicao(pdf)
-        if info:
-            cnc = Path(pdf.name).stem
-            tempo_td = pd.to_timedelta(info["tempo_total"]) if isinstance(info["tempo_total"], str) else info["tempo_total"]
-            total_segundos = int(tempo_td.total_seconds())
-            tempo_formatado = f"{total_segundos // 3600:02}:{(total_segundos % 3600) // 60:02}:{total_segundos % 60:02}"
+        if not info:
+            continue
 
-            inserir_trabalho_pendente({
-                "grupo": f"{info['proposta']}-{int(round(info['espessura']*100)):04d}-{info['material']}",
-                "proposta": info["proposta"],
-                "espessura": info["espessura"],
-                "material": info["material"],
-                "cnc": cnc,
-                "programador": info["programador"],
-                "qtd_chapas": info["qtd_chapas"],
-                "tempo_total": tempo_formatado,
-                "caminho": info["caminho"],
-                "data_prevista": date.today().isoformat(),
-                "processos": [],
-                "autorizado": False,
-                "gas": []
-            })
+        cnc = Path(pdf.name).stem
+        tempo_td = pd.to_timedelta(info["tempo_total"]) if isinstance(info["tempo_total"], str) else info["tempo_total"]
+        total_segundos = int(tempo_td.total_seconds())
+        tempo_formatado = f"{total_segundos // 3600:02}:{(total_segundos % 3600) // 60:02}:{total_segundos % 60:02}"
+
+        dados_trabalho = {
+            "grupo": f"{info['proposta']}-{int(round(info['espessura']*100)):04d}-{info['material']}",
+            "proposta": info["proposta"],
+            "espessura": info["espessura"],
+            "material": info["material"],
+            "cnc": cnc,
+            "programador": info["programador"],
+            "qtd_chapas": info["qtd_chapas"],
+            "tempo_total": tempo_formatado,
+            "caminho": info["caminho"],
+            "data_prevista": date.today().isoformat(),
+            "processos": [],
+            "autorizado": False,
+            "gas": []
+        }
+
+        if cnc_ja_existe(cnc):
+            # Salva em memória para renderizar o diálogo depois
+            st.session_state["cnc_para_confirmar"].append(dados_trabalho)
+        else:
+            inserir_trabalho_pendente(dados_trabalho)
