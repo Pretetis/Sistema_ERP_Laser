@@ -130,7 +130,7 @@ for grupo, itens in grupos.items():
             with col_del:
                 if st.button("🖑 Excluir Trabalho", key=f"del_{grupo}"):
                     # 1. Obter todos os trabalhos do grupo
-                    trabalhos_do_grupo = [t for t in trabalho if t["grupo"] == grupo]
+                    trabalhos_do_grupo = itens  # ← aqui está a correção
 
                     # 2. Excluir imagens (se houver)
                     for trabalho in trabalhos_do_grupo:
@@ -144,6 +144,7 @@ for grupo, itens in grupos.items():
                     # 4. Feedback ao usuário
                     st.success("Trabalho excluído.")
                     st.rerun()
+
 
         for item in itens:
             with st.container(border=True):

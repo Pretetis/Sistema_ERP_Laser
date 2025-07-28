@@ -210,11 +210,14 @@ def atualizar_trabalho_pendente(cnc, grupo, tempo_total, data_prevista=None, pro
 
 def excluir_trabalhos_grupo(grupo: str):
     nome = st.session_state.get("usuario", {}).get("nome", "desconhecido")
-    supabase.table("log_exclusoes").insert({
-        "grupo": grupo,
-        "modificado_por": nome,
-        "timestamp": datetime.now().isoformat()
-    }).execute()
+    registrar_evento(
+        maquina="N/A",  
+        tipo_evento="excluido",
+        proposta=grupo.split("-")[0],  # ajuste conforme necessário
+        cnc="N/A",
+        motivo="Exclusão manual pelo usuário",
+        nome=nome
+    )
 
     supabase.table("trabalhos_pendentes").delete().eq("grupo", grupo).execute()
 
