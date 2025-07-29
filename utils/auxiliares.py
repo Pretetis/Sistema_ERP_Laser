@@ -11,7 +11,7 @@ from utils.db import (
     retornar_para_pendentes, retomar_interrupcao,
     retornar_item_da_fila_para_pendentes
 )
-from utils.db import inserir_trabalho_pendente, atualizar_trabalho_pendente, excluir_trabalhos_grupo
+from utils.db import inserir_trabalho_pendente
 from utils.extracao import extrair_dados_por_posicao
 
 @st.dialog("Interrupção de Corte")
@@ -22,10 +22,11 @@ def abrir_dialogo_interrupcao(maquina):
         corte = obter_corte_atual(maquina)
         if corte:
             registrar_evento(maquina, "parado", corte["proposta"], corte["cnc"], motivo=motivo, nome=nome)
-            atualizar_status_interrompido(maquina, True)  # atualiza status real
-            st.session_state[f"abrir_dialogo_{maquina}"] = False  # FECHA o diálogo
+            atualizar_status_interrompido(maquina, True)  
+            st.session_state[f"abrir_dialogo_{maquina}"] = False  
             st.success("Interrupção registrada.")
             st.rerun()
+
 
 from utils.db import obter_status_interrompido, atualizar_status_interrompido
 def exibir_maquina(maquina, modo="individual", dados_corte=None, fila_maquina=None):
@@ -150,12 +151,20 @@ def exibir_maquina(maquina, modo="individual", dados_corte=None, fila_maquina=No
 
                 if cargo_empilhadeira:
                     if st.button(f"💾 Salvar 'Local Separado' - {maquina}", key=f"btn_salvar_local_{modo}_{maquina}"):
+                        updates = []
                         for idx, novo_valor in enumerate(edited_df["Local Separado"]):
                             id_item = dados_fila[idx]["ID"]
+                            if novo_valor != dados_fila[idx]["Local Separado"]:
+                                updates.append({
+                                    "id": id_item,
+                                    "local_separado": novo_valor
+                                })
+
+                        for update in updates:
                             supabase.table("fila_maquinas").update({
-                                    "local_separado": novo_valor,
-                                    "modificado_por": usuario
-                                }).eq("id", id_item).execute()
+                                "local_separado": update["local_separado"],
+                                "modificado_por": usuario
+                            }).eq("id", update["id"]).execute()
                         st.success("Campos salvos com sucesso.")
                         st.session_state[f"status_salvo_local_{maquina}"] = True
 
@@ -283,9 +292,11 @@ def exibir_maquina(maquina, modo="individual", dados_corte=None, fila_maquina=No
 
                             # Atualiza posições no banco
                             for nova_posicao, id_item in enumerate(nova_ordem_ids):
-                                supabase.table("fila_maquinas").update(
-                                    {"posicao": nova_posicao}
-                                ).eq("id", id_item).execute()
+                                item_original = next((f for f in fila if f["id"] == id_item), None)
+                                if item_original and item_original.get("posicao", -1) != nova_posicao:
+                                    supabase.table("fila_maquinas").update(
+                                        {"posicao": nova_posicao}
+                                    ).eq("id", id_item).execute()
 
                             st.success("Nova ordem de corte salva com sucesso.")
                             st.rerun()

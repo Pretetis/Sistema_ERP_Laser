@@ -1,6 +1,4 @@
 import streamlit as st
-import pandas as pd
-from streamlit_sortables import sort_items
 
 from utils.auth import verificar_autenticacao, logout
 verificar_autenticacao()
@@ -68,7 +66,8 @@ if st.session_state.get("usuario_autenticado"):
 st.sidebar.title("📋 Trabalhos Pendentes")
 trabalhos_raw = (
     supabase.table("trabalhos_pendentes")
-    .select("*")
+    .select("id,grupo,proposta,espessura,material,tempo_total,qtd_chapas",
+            "programador,caminho,data_prevista,processos,gas,cnc")
     .eq("autorizado", True)
     .execute()
     .data or []
@@ -107,9 +106,10 @@ for grupo, itens in grupos.items():
             col_add, col_del = st.columns(2)
             with col_add:
                 if st.button("➕ Enviar todos para a máquina", key=f"btn_add_todos_{grupo}"):
+                    trabalhos_para_enviar = []
                     ids_para_deletar = []
                     for item in itens:
-                        adicionar_na_fila(maquina_escolhida, {
+                        trabalhos_para_enviar.append({
                             "proposta": item["proposta"],
                             "cnc": item["cnc"],
                             "material": item["material"],
@@ -121,11 +121,15 @@ for grupo, itens in grupos.items():
                             "processos": item.get("processos", []),
                             "gas": item.get("gas", None),
                             "data_prevista": item["data_prevista"]
-                        }, usuario)
+                        })
                         ids_para_deletar.append(item["id"])
-
+                        
+                    adicionar_na_fila(maquina_escolhida, trabalhos_para_enviar, usuario)
+                    
                     supabase.table("trabalhos_pendentes").delete().in_("id", ids_para_deletar).execute()
-                    st.session_state["status_envio_grupo"] = grupo  # Marca que esse grupo foi enviado
+                    st.session_state["status_envio_grupo"] = grupo
+                    st.rerun()
+
             with col_del:
                 if st.button("🖑 Excluir Trabalho", key=f"del_{grupo}"):
                     # 1. Obter todos os trabalhos do grupo
@@ -166,7 +170,7 @@ for grupo, itens in grupos.items():
 # =====================
 # Painel Principal - Máquinas
 # =====================
-from utils.db import obter_todos_cortes_atuais, obter_todas_filas, obter_corte_atual, obter_fila
+from utils.db import obter_corte_atual, obter_fila
 
 abas = [f"🔧 {m}" for m in MAQUINAS]
 abas_componentes = st.tabs(abas)

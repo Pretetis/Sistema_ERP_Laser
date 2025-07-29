@@ -13,46 +13,52 @@ from dateutil import parser
 def inserir_trabalho_pendente(dados):
     usuario = st.session_state.get("usuario", {}).get("nome", "desconhecido")
     dados["modificado_por"] = usuario
-    supabase.table("trabalhos_pendentes").insert(dados).execute()
+    executar_seguro(lambda: supabase.table("trabalhos_pendentes").insert(dados).execute(),
+                    mensagem = "Falha ao enserir o trabalho:")
 
 def adicionar_na_fila(maquina, trabalho, modificado_por="desconhecido"):
     nome = st.session_state.get("usuario", {}).get("nome", "desconhecido")
-    supabase.table("fila_maquinas").insert({
-        "maquina": maquina,
-        "proposta": trabalho["proposta"],
-        "cnc": trabalho["cnc"],
-        "material": trabalho["material"],
-        "espessura": trabalho["espessura"],
-        "qtd_chapas": int(trabalho["qtd_chapas"]),
-        "tempo_total": trabalho["tempo_total"],
-        "caminho": trabalho.get("caminho", ""),
-        "programador": trabalho["programador"],
-        "processos": normalizar_processos(trabalho.get("processos")),
-        "gas": trabalho.get("gas", None),
-        "data_prevista": trabalho.get("data_prevista"),
-        "modificado_por": nome,
-    }).execute()
+    if not isinstance(trabalho, list):
+        trabalho = [trabalho]
+    registros = []
+    for t in trabalho:
+        registros.append({        
+            "maquina": maquina,
+            "proposta": t["proposta"],
+            "cnc": t["cnc"],
+            "material": t["material"],
+            "espessura": t["espessura"],
+            "qtd_chapas": int(t["qtd_chapas"]),
+            "tempo_total": t["tempo_total"],
+            "caminho": t.get("caminho", ""),
+            "programador": t["programador"],
+            "processos": normalizar_processos(t.get("processos")),
+            "gas": t.get("gas", None),
+            "data_prevista": t.get("data_prevista"),
+            "modificado_por": nome, })
+    executar_seguro(lambda: supabase.table("fila_maquinas").insert(registros).execute(),
+                    mensagem="Erro ao adicionar na fila")
 
 def obter_fila(maquina):
-    res = supabase.table("fila_maquinas")\
+    res = executar_seguro(lambda: supabase.table("fila_maquinas")\
         .select("*")\
         .eq("maquina", maquina)\
         .order("posicao", desc=False)\
-        .execute()
+        .execute(), mensagem="Erro ao obter a fila de corte: ")
     return res.data if res.data else []
 
 def cnc_ja_existe(cnc: str) -> bool:
-    res = supabase.table("trabalhos_pendentes")\
+    res = executar_seguro(lambda:supabase.table("trabalhos_pendentes")\
         .select("cnc")\
         .eq("cnc", cnc)\
-        .execute()
+        .execute(),mensagem="Erro ao confirmar os CNCs")
     return len(res.data) > 0
 
 def excluir_trabalho_por_cnc(cnc: str):
-    supabase.table("trabalhos_pendentes").delete().eq("cnc", cnc).execute()
+    executar_seguro(lambda:supabase.table("trabalhos_pendentes").delete().eq("cnc", cnc).execute(), mensagem=f"Erro ao excluir o CNC: {cnc}. Devido: ")
 
 def obter_corte_atual(maquina):
-    res = supabase.table("corte_atual").select("*").eq("maquina", maquina).execute()
+    res = executar_seguro(lambda: supabase.table("corte_atual").select("*").eq("maquina", maquina).execute(), mensagem="Erro ao obter o corte atal: ")
     return res.data[0] if res.data else None
 
 
@@ -61,15 +67,15 @@ def iniciar_corte(maquina, id_fila):
     fuso_sp = pytz.timezone("America/Sao_Paulo")
     agora = datetime.now(fuso_sp).isoformat()
 
-    fila = supabase.table("fila_maquinas").select("*").eq("id", id_fila).execute()
+    fila = executar_seguro(lambda:supabase.table("fila_maquinas").select("*").eq("id", id_fila).execute(),mensagem="Erro ao buscar item da fila: ")
     if not fila.data:
         return
 
     item = fila.data[0]
 
-    supabase.table("fila_maquinas").delete().eq("id", id_fila).execute()
+    executar_seguro(lambda: supabase.table("fila_maquinas").delete().eq("id", id_fila).execute(), mensagem="Erro ao remover da fila: ")
 
-    supabase.table("corte_atual").upsert({
+    executar_seguro(lambda:supabase.table("corte_atual").upsert({
         "maquina": item["maquina"],
         "proposta": item["proposta"],
         "cnc": item["cnc"],
@@ -84,7 +90,7 @@ def iniciar_corte(maquina, id_fila):
         "data_prevista": item["data_prevista"],
         "inicio": agora,
         "modificado_por": nome,
-    }).execute()
+    }).execute(),mensagem="Erro ao iniciar o corte: ")
 
     registrar_evento(maquina, "iniciado", item["proposta"], item["cnc"], nome=nome)
 
@@ -109,11 +115,11 @@ def finalizar_corte(maquina, nome):
         novo_tempo = tempo_por_chapa * novo_qtd_chapas
         novo_tempo_str = timedelta_to_hms_string(novo_tempo)
 
-        supabase.table("corte_atual").update({
+        executar_seguro(lambda:supabase.table("corte_atual").update({
             "qtd_chapas": novo_qtd_chapas,
             "tempo_total": novo_tempo_str,
             "modificado_por": nome,
-        }).eq("maquina", maquina).execute()
+        }).eq("maquina", maquina).execute(),mensagem="Erro ao atualizar o corte: ")
 
         registrar_evento(maquina, "chapa_finalizada", atual["proposta"], atual["cnc"], nome=nome)
 
@@ -123,11 +129,11 @@ def finalizar_corte(maquina, nome):
 
 
 def excluir_da_fila(maquina, id_trabalho):
-    supabase.table("fila_maquinas").delete().eq("maquina", maquina).eq("id", id_trabalho).execute()
+    executar_seguro(lambda:supabase.table("fila_maquinas").delete().eq("maquina", maquina).eq("id", id_trabalho).execute(), mensagem="Erro ao remover da fila: ")
 
 
 def excluir_do_corte(maquina):
-    supabase.table("corte_atual").delete().eq("maquina", maquina).execute()
+    executar_seguro(lambda:supabase.table("corte_atual").delete().eq("maquina", maquina).execute(), mensagem="Erro ao remover do corte: ")
 
 def retornar_para_pendentes(maquina):
     atual = obter_corte_atual(maquina)
@@ -159,7 +165,7 @@ def retornar_para_pendentes(maquina):
 
 def retornar_item_da_fila_para_pendentes(id_trabalho):
     nome = st.session_state.get("usuario", {}).get("nome", "desconhecido")
-    res = supabase.table("fila_maquinas").select("*").eq("id", id_trabalho).execute()
+    res = executar_seguro(lambda:supabase.table("fila_maquinas").select("*").eq("id", id_trabalho).execute(),mensagem="Erro ao retornar pendência: ")
     if not res.data:
         return
 
@@ -190,10 +196,11 @@ def retornar_item_da_fila_para_pendentes(id_trabalho):
 
 def atualizar_quantidade(maquina, nova_quantidade):
     nome = st.session_state.get("usuario", {}).get("nome", "desconhecido")
-    supabase.table("corte_atual").update({
-        "qtd_chapas": nova_quantidade,
-        "modificado_por": nome,
-    }).eq("maquina", maquina).execute()
+    executar_seguro(lambda: supabase.table("corte_atual").update({
+            "qtd_chapas": nova_quantidade,
+            "modificado_por": nome,
+        }).eq("maquina", maquina).execute(),
+        mensagem="Erro ao atualizar a quantidade: ")
 
 
 
@@ -211,11 +218,12 @@ def atualizar_trabalho_pendente(cnc, grupo, tempo_total, data_prevista=None, pro
     # Remove campos nulos para evitar sobrescrita
     update_data = {k: v for k, v in update_data.items() if v is not None}
 
-    supabase.table("trabalhos_pendentes")\
-        .update(update_data)\
-        .eq("grupo", grupo)\
-        .eq("cnc", cnc)\
-        .execute()
+    executar_seguro(lambda: supabase.table("trabalhos_pendentes")\
+            .update(update_data)\
+            .eq("grupo", grupo)\
+            .eq("cnc", cnc)\
+            .execute(),
+            mensagem="Erro ao atualizar o trabalho: ")
 
 def excluir_trabalhos_grupo(grupo: str):
     nome = st.session_state.get("usuario", {}).get("nome", "desconhecido")
@@ -228,7 +236,7 @@ def excluir_trabalhos_grupo(grupo: str):
         nome=nome
     )
 
-    supabase.table("trabalhos_pendentes").delete().eq("grupo", grupo).execute()
+    executar_seguro(lambda:supabase.table("trabalhos_pendentes").delete().eq("grupo", grupo).execute(),mensagem="Erro ao excluir o conjunto de trabalhos: ")
 
     
 def timedelta_to_hms_string(td):
@@ -244,14 +252,14 @@ def normalizar_processos(val):
 
 def retomar_interrupcao(maquina):
     nome = st.session_state.get("usuario", {}).get("nome", "desconhecido")
-    res = supabase.table("eventos_corte")\
+    res = executar_seguro(lambda:supabase.table("eventos_corte")\
         .select("*")\
         .eq("maquina", maquina)\
         .eq("tipo_evento", "parado")\
         .is_("tempo_total", None)\
         .order("timestamp", desc=True)\
         .limit(1)\
-        .execute()
+        .execute(),mensagem="Erro ao retomar o corte: ")
 
     if res.data:
         parada = res.data[0]
@@ -278,7 +286,7 @@ def retomar_interrupcao(maquina):
 def registrar_evento(maquina, tipo_evento, proposta, cnc, motivo=None, tempo_total=None, nome=None):
     if not nome:
         nome = st.session_state.get("usuario", {}).get("nome", "desconhecido")
-    supabase.table("eventos_corte").insert({
+    executar_seguro(lambda: supabase.table("eventos_corte").insert({
         "maquina": maquina,
         "proposta": proposta,
         "cnc": cnc,
@@ -287,14 +295,14 @@ def registrar_evento(maquina, tipo_evento, proposta, cnc, motivo=None, tempo_tot
         "motivo": motivo,
         "tempo_total": tempo_total,
         "modificado_por": nome,
-    }).execute()
+    }).execute(), mensagem="Erro ao registrar no histórico: ")
 def obter_eventos_corte(maquina):
     try:
-        res = supabase.table("eventos_corte")\
+        res = executar_seguro(lambda:supabase.table("eventos_corte")\
             .select("*")\
             .eq("maquina", maquina)\
             .order("timestamp", desc=False)\
-            .execute()
+            .execute(), mensagem="Erro ao obter o histórico: ")
         return res.data
     except Exception as e:
         st.error(f"Erro ao obter eventos da máquina {maquina}: {e}")
@@ -400,19 +408,26 @@ def mostrar_grafico_eventos(maquina, modo="individual"):
     )
 
 def obter_status_interrompido(maquina: str):
-    result = supabase.table("corte_atual").select("interrompido").eq("maquina", maquina).execute()
+    result = executar_seguro(lambda:supabase.table("corte_atual").select("interrompido").eq("maquina", maquina).execute(),mensagem="Erro ao obter a interrupção: ")
     data = result.data
     return data[0]["interrompido"] if data else False
 
 def atualizar_status_interrompido(maquina: str, interrompido: bool):
-    supabase.table("corte_atual").update({"interrompido": interrompido}).eq("maquina", maquina).execute()
+    executar_seguro(lambda: supabase.table("corte_atual").update({"interrompido": interrompido}).eq("maquina", maquina).execute(), mensagem="Erro ao interromper: ")
 
 def obter_todos_cortes_atuais():
-    res = supabase.table("corte_atual").select("*").execute()
+    res = executar_seguro(lambda: supabase.table("corte_atual").select("*").execute(),mensagem="Erro ao obter os cortes: ")
     return {r["maquina"]: r for r in res.data} if res.data else {}
 def obter_todas_filas():
-    res = supabase.table("fila_maquinas").select("*").order("posicao").execute()
+    res = executar_seguro(lambda:supabase.table("fila_maquinas").select("*").order("posicao").execute(),mensagem="Erro ao obter as filas: ")
     filas = {}
     for item in res.data or []:
         filas.setdefault(item["maquina"], []).append(item)
     return filas
+
+def executar_seguro(funcao, mensagem="Erro durante execução"):
+    try:
+        return funcao()
+    except Exception as e:
+        st.error(f"❌ {mensagem}: {e}")
+        return None

@@ -7,6 +7,7 @@ from io import BytesIO
 from PIL import Image
 from datetime import datetime
 from zoneinfo import ZoneInfo
+from supabase import create_client, Client
 
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
