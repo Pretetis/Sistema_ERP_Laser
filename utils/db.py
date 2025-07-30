@@ -154,7 +154,7 @@ def retornar_para_pendentes(maquina):
         "data_prevista": atual["data_prevista"],
         "processos": normalizar_processos(atual.get("processos")),
         "autorizado": True,
-        "caminho": atual.get("caminho", f"CNC/{atual['cnc']}.pdf"),
+        "caminho": atual.get("caminho"),
         "gas": atual.get("gas", None)
     }
 

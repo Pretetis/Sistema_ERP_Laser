@@ -1,23 +1,21 @@
 import streamlit as st
-import pandas as pd
 from streamlit_sortables import sort_items
+from streamlit import session_state as ss
+
+import pandas as pd
+import hashlib
 from datetime import date
 from pathlib import Path
 
 from utils.supabase import supabase, excluir_imagem_supabase
-from utils.db import (
-    obter_fila, registrar_evento, mostrar_grafico_eventos,
-    obter_corte_atual, iniciar_corte, finalizar_corte,
-    retornar_para_pendentes, retomar_interrupcao,
-    retornar_item_da_fila_para_pendentes
-)
-from utils.db import inserir_trabalho_pendente
 from utils.extracao import extrair_dados_por_posicao
-import hashlib
-from collections import defaultdict
-from utils.db import excluir_trabalhos_grupo, adicionar_na_fila
-from utils.supabase import supabase, excluir_imagem_supabase
-from streamlit import session_state as ss
+from utils.db import (
+    obter_fila, registrar_evento, mostrar_grafico_eventos, excluir_trabalho_por_cnc,
+    obter_corte_atual, iniciar_corte, finalizar_corte, cnc_ja_existe,
+    retornar_para_pendentes, retomar_interrupcao, adicionar_na_fila,
+    retornar_item_da_fila_para_pendentes, inserir_trabalho_pendente,
+    obter_status_interrompido, atualizar_status_interrompido
+)
 
 def hash_grupo(grupo: str) -> str:
     return hashlib.md5(grupo.encode()).hexdigest()[:6]
@@ -35,15 +33,6 @@ def abrir_dialogo_interrupcao(maquina):
             st.success("Interrupção registrada.")
             st.rerun()
 
-def get_maquina_update_token(maquina):
-    return st.session_state.get(f"update_token_{maquina}", 0)
-
-def trigger_maquina_update(maquina):
-    st.session_state[f"gatilho_atualizacao_{maquina}"] = st.session_state.get(f"gatilho_atualizacao_{maquina}", 0) + 1
-
-def trigger_trabalhos_pendentes():
-    st.session_state["atualizar_trabalhos_pendentes"] = st.session_state.get("atualizar_trabalhos_pendentes", 0) + 1
-
 @st.fragment
 def renderizar_maquina_fragment(maquina, modo="individual",gatilho=0):
     _ = gatilho  # força rerender
@@ -53,8 +42,6 @@ def renderizar_maquina_fragment(maquina, modo="individual",gatilho=0):
     dados_corte = obter_corte_atual(maquina)
     fila_maquina = obter_fila(maquina)
     exibir_maquina(maquina, modo=modo, dados_corte=dados_corte, fila_maquina=fila_maquina)
-
-from utils.db import obter_status_interrompido, atualizar_status_interrompido
 
 def exibir_maquina(maquina, modo="individual", dados_corte=None, fila_maquina=None):
     if st.session_state.get(f"status_corte_finalizado_{maquina}"):
@@ -128,6 +115,9 @@ def exibir_maquina(maquina, modo="individual", dados_corte=None, fila_maquina=No
                     if st.button("🔁 Retornar para Pendentes", key=f"ret_{key_prefix}"):
                         retornar_para_pendentes(maquina)
                         st.success("Trabalho retornado para pendentes")
+                        fn_pendentes = ss.get("atualizar_trabalhos_pendentes_fn")
+                        if fn_pendentes:
+                            fn_pendentes()
                         st.rerun(scope="fragment")
         else:
             st.markdown("_Nenhum corte em andamento_")
@@ -339,8 +329,6 @@ def exibir_maquina(maquina, modo="individual", dados_corte=None, fila_maquina=No
 
     with st.expander("Gerar Gráfico da Máquina", expanded=True):
         mostrar_grafico_eventos(maquina)
-
-from utils.db import cnc_ja_existe, excluir_trabalho_por_cnc
 
 @st.dialog("Substituir CNC Existente")
 def confirmar_substituicao_cnc(dados_trabalho):

@@ -4,17 +4,11 @@ credentials
 
 # Ignorar arquivos temporários
 *.pyc
-utils/__pycache__/
+**/__pycache__/
 tmp/
 *.log
+
 
 # Ignorar diretórios específicos
 venv/
 .env/
-
-#ignorar o db
-estado_maquinas.db
-utils/db_antigo
-
-#ignorar as imagens
-previews/

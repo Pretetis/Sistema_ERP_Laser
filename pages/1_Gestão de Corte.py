@@ -1,11 +1,9 @@
 import streamlit as st
-
+from streamlit_autorefresh import st_autorefresh
 from utils.auth import verificar_autenticacao, logout
 verificar_autenticacao()
 
-from utils.auxiliares import renderizar_maquina_fragment
-from streamlit_autorefresh import st_autorefresh
-from utils.auxiliares import renderizar_trabalhos_pendentes
+from utils.auxiliares import renderizar_maquina_fragment, renderizar_trabalhos_pendentes
 
 usuario = st.session_state.get("usuario", {}).get("nome", "desconhecido")
 cargo_usuario = st.session_state.get("usuario", {}).get("cargo", "")
