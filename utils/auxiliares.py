@@ -58,7 +58,6 @@ from utils.db import obter_status_interrompido, atualizar_status_interrompido
 
 def exibir_maquina(maquina, modo="individual", dados_corte=None, fila_maquina=None):
     if st.session_state.get(f"status_corte_finalizado_{maquina}"):
-        st.success("Corte finalizado com sucesso!")
         st.session_state[f"status_corte_finalizado_{maquina}"] = False
     usuario = st.session_state.get("usuario", {}).get("nome", "desconhecido")
     cargo_usuario = st.session_state.get("usuario", {}).get("cargo", "")
@@ -106,6 +105,7 @@ def exibir_maquina(maquina, modo="individual", dados_corte=None, fila_maquina=No
                             finalizar_corte(maquina, usuario)
                             st.success("Corte finalizado")
                             st.session_state[f"status_corte_finalizado_{maquina}"] = True
+                            st.rerun(scope="fragment")
 
                     with col_intr:
                         key_prefix = f"{modo}_{maquina.replace(' ', '_')}"
@@ -121,14 +121,14 @@ def exibir_maquina(maquina, modo="individual", dados_corte=None, fila_maquina=No
                             retomar_interrupcao(maquina)
                             atualizar_status_interrompido(maquina, False)
                             st.success("Corte retomado.")
-                            st.rerun()
+                            st.rerun(scope="fragment")
 
                 with col_pend:
                     key_prefix = f"{modo}_{maquina.replace(' ', '_')}"
                     if st.button("🔁 Retornar para Pendentes", key=f"ret_{key_prefix}"):
                         retornar_para_pendentes(maquina)
                         st.success("Trabalho retornado para pendentes")
-                        st.rerun()
+                        st.rerun(scope="fragment")
         else:
             st.markdown("_Nenhum corte em andamento_")
 
@@ -217,7 +217,12 @@ def exibir_maquina(maquina, modo="individual", dados_corte=None, fila_maquina=No
                         if st.button("🔁 Retornar CNC para Pendentes", key=f"ret_fila_{modo}_{maquina}"):
                             retornar_item_da_fila_para_pendentes(opcoes[escolha])
                             st.success("Item da fila retornado para pendentes.")
-                            st.rerun()
+
+                            fn_pendentes = ss.get("atualizar_trabalhos_pendentes_fn")
+                            if fn_pendentes:
+                                fn_pendentes()
+                            st.rerun(scope="fragment")
+
             with aba_ordenacao:
                 st.markdown("### 🔃 Ordem de Corte")
 
@@ -331,8 +336,8 @@ def exibir_maquina(maquina, modo="individual", dados_corte=None, fila_maquina=No
         else:
             st.divider()
             st.markdown("_Fila vazia_")
-            
-    with st.expander("Gerar Gráfico da Máquina"):
+
+    with st.expander("Gerar Gráfico da Máquina", expanded=True):
         mostrar_grafico_eventos(maquina)
 
 from utils.db import cnc_ja_existe, excluir_trabalho_por_cnc
@@ -402,14 +407,11 @@ def processar_pdfs(pdfs):
 MAQUINAS = ["LASER 1", "LASER 2", "LASER 3", "LASER 4", "LASER 5", "LASER 6"]
 from utils.db import adicionar_na_fila
 
-@st.dialog("Enviar CNC para Máquina")
 def modal_enviar_cnc(item):
     from utils.supabase import supabase  # garantir que está importado
 
     usuario = st.session_state.get("usuario", {}).get("nome", "desconhecido")
     item_id = item.get("id", "desconhecido")  # fallback caso não tenha id
-
-    st.markdown(f"### Enviar CNC `{item['cnc']}` para máquina")
 
     maquina_escolhida = st.selectbox(
         "Selecione a máquina",
@@ -447,6 +449,7 @@ def modal_enviar_cnc(item):
 
         # Atualiza trabalhos pendentes
         st.session_state["atualizar_trabalhos_pendentes"] = st.session_state.get("atualizar_trabalhos_pendentes", 0) + 1
+        st.rerun(scope="fragment")
 
 @st.fragment
 def renderizar_trabalhos_pendentes(gatilho=0):
@@ -480,7 +483,6 @@ def renderizar_trabalhos_pendentes(gatilho=0):
     grupo_sucesso = ss.get("status_envio_grupo")
     if grupo_sucesso in grupos:
         del grupos[grupo_sucesso]
-        st.success(f"Grupo {grupo_sucesso} enviado com sucesso!")
         ss["status_envio_grupo"] = None
 
     for idx, (grupo, itens) in enumerate(grupos.items()):
@@ -557,6 +559,7 @@ def renderizar_trabalhos_pendentes(gatilho=0):
                         if "atualizar_trabalhos_pendentes_fn" in ss:
                             ss["atualizar_trabalhos_pendentes_fn"]()
                         st.success("Trabalho excluído.")
+                        st.rerun(scope="fragment")
 
             for i, item in enumerate(itens):
                 with st.container(border=True):
@@ -567,12 +570,9 @@ def renderizar_trabalhos_pendentes(gatilho=0):
                         st.markdown(f"**Qtd Chapas:** {item['qtd_chapas']}")
                         st.markdown(f"**Tempo Total:** {item['tempo_total']}")
                         if cargo_pcp or cargo_operador:
-                            if st.button(
-                                "📄 Enviar CNC para Máquina",
-                                key=f"btn_enviar_cnc_unitario_{idx}_{i}_{grupo_hash}_{item['id']}"
-                            ):
-                                ss["modal_cnc_item"] = item
-
+                            with st.container(border=False):
+                                st.write("📄 Enviar CNC para Máquina")
+                                modal_enviar_cnc(item)
                     with col2:
                         if item["caminho"].startswith("http"):
                             st.image(item["caminho"], caption=f"CNC {item['cnc']}", use_container_width=True)
