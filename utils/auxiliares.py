@@ -331,10 +331,9 @@ def exibir_maquina(maquina, modo="individual", dados_corte=None, fila_maquina=No
         else:
             st.divider()
             st.markdown("_Fila vazia_")
-
-        st.divider()
-        with st.expander("Gerar Gráfico da Máquina"):
-            mostrar_grafico_eventos(maquina)
+            
+    with st.expander("Gerar Gráfico da Máquina"):
+        mostrar_grafico_eventos(maquina)
 
 from utils.db import cnc_ja_existe, excluir_trabalho_por_cnc
 
