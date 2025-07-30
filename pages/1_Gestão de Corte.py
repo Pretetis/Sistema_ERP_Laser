@@ -5,6 +5,7 @@ verificar_autenticacao()
 
 from utils.auxiliares import renderizar_maquina_fragment
 from streamlit_autorefresh import st_autorefresh
+from utils.auxiliares import renderizar_trabalhos_pendentes
 
 usuario = st.session_state.get("usuario", {}).get("nome", "desconhecido")
 cargo_usuario = st.session_state.get("usuario", {}).get("cargo", "")
@@ -31,11 +32,10 @@ if st.session_state.get("usuario_autenticado"):
 with st.sidebar:
     st.title("📋 Trabalhos Pendentes")
     container_pendentes = st.empty()
-    from utils.auxiliares import renderizar_trabalhos_pendentes
 
     def atualizar_trabalhos_pendentes():
         with container_pendentes:
-            renderizar_trabalhos_pendentes()
+            renderizar_trabalhos_pendentes(gatilho=st.session_state.get("atualizar_trabalhos_pendentes", 0))
     
     st.session_state["atualizar_trabalhos_pendentes_fn"] = atualizar_trabalhos_pendentes
     atualizar_trabalhos_pendentes()

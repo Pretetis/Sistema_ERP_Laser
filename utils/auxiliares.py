@@ -405,40 +405,59 @@ from utils.db import adicionar_na_fila
 
 @st.dialog("Enviar CNC para Máquina")
 def modal_enviar_cnc(item):
-        usuario = st.session_state.get("usuario", {}).get("nome", "desconhecido")
-        st.markdown(f"### Enviar CNC `{item['cnc']}` para máquina")
-        maquina_escolhida = st.selectbox("Selecione a máquina", MAQUINAS, key=f"modal_sel_maquina_{item['id']}")
-        if st.button("🚀 Confirmar envio", key=f"confirmar_envio_{item['id']}"):
-            adicionar_na_fila(maquina_escolhida, {
-                "proposta": item["proposta"],
-                "cnc": item["cnc"],
-                "material": item["material"],
-                "espessura": item["espessura"],
-                "qtd_chapas": int(item["qtd_chapas"]),
-                "tempo_total": item["tempo_total"],
-                "caminho": item["caminho"],
-                "programador": item.get("programador", "DESCONHECIDO"),
-                "processos": item.get("processos", []),
-                "gas": item.get("gas", None),
-                "data_prevista": item["data_prevista"]
-            },usuario)
+    from utils.supabase import supabase  # garantir que está importado
 
-            # Remove apenas o CNC individual das pendências
-            supabase.table("trabalhos_pendentes") \
-                .delete() \
-                .eq("id", item["id"]) \
-                .execute()
+    usuario = st.session_state.get("usuario", {}).get("nome", "desconhecido")
+    item_id = item.get("id", "desconhecido")  # fallback caso não tenha id
 
-            fn_maquina = st.session_state.get(f"atualizar_maquina_fn_{maquina_escolhida}")
-            if fn_maquina:
-                fn_maquina()
-            if "atualizar_trabalhos_pendentes_fn" in st.session_state:
-                st.session_state["atualizar_trabalhos_pendentes_fn"]()
-            st.session_state["modal_cnc_item"] = None
+    st.markdown(f"### Enviar CNC `{item['cnc']}` para máquina")
+
+    maquina_escolhida = st.selectbox(
+        "Selecione a máquina",
+        MAQUINAS,
+        key=f"modal_sel_maquina_{item_id}"
+    )
+
+    if st.button("🚀 Confirmar envio", key=f"modal_btn_confirmar_envio_{item_id}"):
+        adicionar_na_fila(maquina_escolhida, {
+            "proposta": item["proposta"],
+            "cnc": item["cnc"],
+            "material": item["material"],
+            "espessura": item["espessura"],
+            "qtd_chapas": int(item["qtd_chapas"]),
+            "tempo_total": item["tempo_total"],
+            "caminho": item["caminho"],
+            "programador": item.get("programador", "DESCONHECIDO"),
+            "processos": item.get("processos", []),
+            "gas": item.get("gas", None),
+            "data_prevista": item["data_prevista"]
+        }, usuario)
+
+        # Remove apenas o CNC individual das pendências
+        supabase.table("trabalhos_pendentes") \
+            .delete() \
+            .eq("id", item_id) \
+            .execute()
+
+        # Atualiza interface
+        fn_maquina = st.session_state.get(f"atualizar_maquina_fn_{maquina_escolhida}")
+        if fn_maquina:
+            fn_maquina()
+        # Remove do modal imediatamente
+        st.session_state["modal_cnc_item"] = None
+
+        # Atualiza trabalhos pendentes
+        st.session_state["atualizar_trabalhos_pendentes"] = st.session_state.get("atualizar_trabalhos_pendentes", 0) + 1
 
 @st.fragment
-def renderizar_trabalhos_pendentes():
-    _ = st.session_state.get("atualizar_trabalhos_pendentes", 0)
+def renderizar_trabalhos_pendentes(gatilho=0):
+    from collections import defaultdict
+    from utils.db import excluir_trabalhos_grupo, adicionar_na_fila
+    from utils.supabase import supabase, excluir_imagem_supabase
+    from streamlit import session_state as ss
+
+    contador = st.session_state.get("atualizar_trabalhos_pendentes", 0)
+    _ = gatilho
     usuario = ss.get("usuario", {}).get("nome", "desconhecido")
     cargo_usuario = ss.get("usuario", {}).get("cargo", "")
     cargo_pcp = cargo_usuario in ["PCP", "Gerente"]
@@ -448,7 +467,7 @@ def renderizar_trabalhos_pendentes():
 
     trabalhos_raw = (
         supabase.table("trabalhos_pendentes")
-        .select("id,grupo,proposta,espessura,material,tempo_total,qtd_chapas",
+        .select("id,grupo,proposta,espessura,material,tempo_total,qtd_chapas,"
                 "programador,caminho,data_prevista,processos,gas,cnc")
         .eq("autorizado", True)
         .execute()
@@ -459,26 +478,23 @@ def renderizar_trabalhos_pendentes():
     for t in trabalhos_raw:
         grupos[t["grupo"]].append(t)
 
-    # Remove grupo já enviado com sucesso
     grupo_sucesso = ss.get("status_envio_grupo")
     if grupo_sucesso in grupos:
         del grupos[grupo_sucesso]
         st.success(f"Grupo {grupo_sucesso} enviado com sucesso!")
         ss["status_envio_grupo"] = None
 
-    # Agora iteramos com segurança
     for idx, (grupo, itens) in enumerate(grupos.items()):
         grupo_hash = hash_grupo(grupo)
-
         trabalho = itens[0]
+
         titulo_linha1 = (
             f"🔹 {trabalho.get('proposta', 'N/D')} | {trabalho.get('espessura', 'N/D')} mm | "
             f"{trabalho.get('material', 'N/D')} | x{len(itens)} CNCs | ⏱ {trabalho.get('tempo_total', 'N/D')}"
         )
-
         data_fmt = "/".join(reversed(trabalho["data_prevista"].split("-")))
         gas_fmt = f"💨 {trabalho.get('gas')}" if trabalho.get("gas") else ""
-        titulo_linha2 = (f"📅 {data_fmt} | ⚙️ {trabalho.get('processos')} | {gas_fmt}")        
+        titulo_linha2 = f"📅 {data_fmt} | ⚙️ {trabalho.get('processos')} | {gas_fmt}"
         titulo = f"{titulo_linha1}\n\n{titulo_linha2}"
 
         with st.expander(titulo, expanded=False):
@@ -488,9 +504,13 @@ def renderizar_trabalhos_pendentes():
                     MAQUINAS,
                     key=f"sel_maquina_{idx}_{grupo_hash}"
                 )
+
                 col_add, col_del = st.columns(2)
                 with col_add:
-                    if st.button("➕ Enviar todos para a máquina", key=f"btn_add_todos_{idx}_{grupo_hash}"):
+                    if st.button(
+                        "➕ Enviar todos para a máquina",
+                        key=f"btn_add_todos_{idx}_{grupo_hash}"
+                    ):
                         trabalhos_para_enviar = []
                         ids_para_deletar = []
                         for item in itens:
@@ -513,26 +533,33 @@ def renderizar_trabalhos_pendentes():
                         supabase.table("trabalhos_pendentes").delete().in_("id", ids_para_deletar).execute()
                         ss["status_envio_grupo"] = grupo
 
-                        fn_pendentes = st.session_state.get("atualizar_trabalhos_pendentes_fn")
+                        ss["atualizar_trabalhos_pendentes"] = ss.get("atualizar_trabalhos_pendentes", 0) + 1
+                        fn_pendentes = ss.get("atualizar_trabalhos_pendentes_fn")
                         if fn_pendentes:
                             fn_pendentes()
 
-                        fn_maquina = st.session_state.get(f"atualizar_maquina_fn_{maquina_escolhida}")
+                        fn_maquina = ss.get(f"atualizar_maquina_fn_{maquina_escolhida}")
                         if fn_maquina:
                             fn_maquina()
+                        
+                        st.rerun(scope="fragment")
 
-            with col_del:
-                if st.button("🖑 Excluir Trabalho", key=f"del_{grupo_hash}"):
-                    for trabalho in itens:
-                        caminho = trabalho.get("caminho")
-                        if caminho:
-                            excluir_imagem_supabase(caminho)
-                    excluir_trabalhos_grupo(grupo)
-                    if "atualizar_trabalhos_pendentes_fn" in st.session_state:
-                        st.session_state["atualizar_trabalhos_pendentes_fn"]() 
-                    st.success("Trabalho excluído.")
+                with col_del:
+                    if st.button(
+                        "🖑 Excluir Trabalho",
+                        key=f"del_{idx}_{grupo_hash}"  
+                    ):
+                        for trabalho in itens:
+                            caminho = trabalho.get("caminho")
+                            if caminho:
+                                excluir_imagem_supabase(caminho)
+                        excluir_trabalhos_grupo(grupo)
+                        
+                        if "atualizar_trabalhos_pendentes_fn" in ss:
+                            ss["atualizar_trabalhos_pendentes_fn"]()
+                        st.success("Trabalho excluído.")
 
-            for item in itens:
+            for i, item in enumerate(itens):
                 with st.container(border=True):
                     col1, col2 = st.columns([2, 2])
                     with col1:
@@ -541,19 +568,21 @@ def renderizar_trabalhos_pendentes():
                         st.markdown(f"**Qtd Chapas:** {item['qtd_chapas']}")
                         st.markdown(f"**Tempo Total:** {item['tempo_total']}")
                         if cargo_pcp or cargo_operador:
-                            if st.button("📄 Enviar CNC para Máquina", key=f"btn_enviar_cnc_{item['id']}"):
-                                st.session_state["modal_cnc_item"] = item
+                            if st.button(
+                                "📄 Enviar CNC para Máquina",
+                                key=f"btn_enviar_cnc_unitario_{idx}_{i}_{grupo_hash}_{item['id']}"
+                            ):
+                                ss["modal_cnc_item"] = item
 
                     with col2:
                         if item["caminho"].startswith("http"):
                             st.image(item["caminho"], caption=f"CNC {item['cnc']}", use_container_width=True)
                         else:
                             st.warning("Imagem não encontrada.")
-
-    item_modal = st.session_state.get("modal_cnc_item")
-    if item_modal and not st.session_state.get("rerun_do_modal"):
-        st.session_state["rerun_do_modal"] = True
+    item_modal = ss.get("modal_cnc_item")
+    if item_modal and not ss.get("rerun_do_modal"):
+        ss["rerun_do_modal"] = True
         modal_enviar_cnc(item_modal)
-    elif st.session_state.get("rerun_do_modal"):
-        st.session_state["modal_cnc_item"] = None
-        st.session_state["rerun_do_modal"] = False
+    elif ss.get("rerun_do_modal"):
+        ss["modal_cnc_item"] = None
+        ss["rerun_do_modal"] = False
