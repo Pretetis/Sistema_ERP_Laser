@@ -2,10 +2,14 @@ import streamlit as st
 from streamlit_sortables import sort_items
 from streamlit import session_state as ss
 
+import time
+import uuid
 import pandas as pd
 import hashlib
+import re
 from datetime import date
 from pathlib import Path
+from streamlit_extras.stylable_container import stylable_container
 
 from utils.supabase import supabase, excluir_imagem_supabase
 from utils.extracao import extrair_dados_por_posicao
@@ -18,18 +22,49 @@ from utils.db import (
 )
 
 def hash_grupo(grupo: str) -> str:
-    return hashlib.md5(grupo.encode()).hexdigest()[:6]
+    return hashlib.md5(grupo.encode()).hexdigest()[:10]
 
 @st.dialog("Interrupção de Corte")
 def abrir_dialogo_interrupcao(maquina):
     nome = st.session_state.get("usuario", {}).get("nome", "desconhecido")
-    motivo = st.text_area("Motivo da Interrupção", key=f"motivo_{maquina}")
+    motivos_padrao = [
+        " ",
+        "Manutenção",
+        "Troca de Bico",
+        "Troca de Lente",
+        "Ajuste de Parâmetros",
+        "Adição Microcorte",
+        "Redefinição de Programação",
+        "Falta de Gás",
+        "Inspeção de Qualidade",
+        "Colisão",
+        "Dimensional MP",
+        "Intervalo / Almoço",
+    ]
+    motivos_selecionados = st.multiselect(
+        "Selecione o(s) motivo(s) da interrupção",
+        motivos_padrao,
+        key=f"motivos_multiselect_{maquina}"
+    )
+    # Campo para motivo personalizado, caso não esteja listado
+    motivo_personalizado = st.text_input(
+        "Outro motivo (preencher apenas se não estiver listado acima)",
+        key=f"motivo_personalizado_{maquina}"
+    )
     if st.button("Confirmar Parada", key=f"confirmar_parada_{maquina}"):
         corte = obter_corte_atual(maquina)
         if corte:
-            registrar_evento(maquina, "parado", corte["proposta"], corte["cnc"], motivo=motivo, nome=nome)
-            atualizar_status_interrompido(maquina, True)  
-            st.session_state[f"abrir_dialogo_{maquina}"] = False  
+            # Define o motivo final com prioridade para os selecionados
+            if motivos_selecionados:
+                motivo_final = "; ".join(motivos_selecionados)
+            elif motivo_personalizado.strip():
+                motivo_final = motivo_personalizado.strip()
+            else:
+                st.warning("Por favor, selecione um motivo ou preencha o campo de outro motivo.")
+                return
+            registrar_evento(maquina, "parado", corte["proposta"], corte["cnc"], motivo=motivo_final, nome=nome)
+            atualizar_status_interrompido(maquina, True)
+            st.session_state[f"abrir_dialogo_{maquina}"] = False
             st.success("Interrupção registrada.")
             st.rerun()
 
@@ -56,77 +91,117 @@ def exibir_maquina(maquina, modo="individual", dados_corte=None, fila_maquina=No
     key_base = f"{modo}_{maquina.replace(' ', '_')}"
 
     with st.container(border=True):
-        st.markdown(f"## 🔧 {maquina}")
+        st.markdown(f"## :material/Precision_Manufacturing: {maquina}")
 
         corte = dados_corte if dados_corte is not None else obter_corte_atual(maquina)
         fila = fila_maquina if fila_maquina is not None else obter_fila(maquina)
 
         if corte:
+            repeticao = corte.get("repeticao", 1)
+            total_chapas = corte.get("qtd_chapas", 0)
+            caminho_img = corte.get("caminho", "")
+            link_imagem = f"[:mag_right:]({caminho_img})" if caminho_img.startswith("http") else ""
+
             st.subheader(
-                f"**🔹 Corte Atual:** x{corte.get('qtd_chapas', 'N/D')} | CNC {corte.get('cnc', 'N/D')} | "
+                f"**🔹 Corte Atual:** {repeticao} / {repeticao + total_chapas} chapas | CNC {corte.get('cnc', 'N/D')} {link_imagem} | "
                 f"{corte.get('material', 'N/D')} | {corte.get('espessura', 'N/D')} mm"
             )
-
             if cargo_operador or cargo_pcp:
                 interrompido = obter_status_interrompido(maquina)
 
                 with st.container(border=True):
                     col_fim, col_intr, col_ret, col_pend = st.columns(4)
 
-                if not interrompido:
-                    with col_fim:
-                        key_prefix = f"{modo}_{maquina.replace(' ', '_')}"
-                        if st.button("✅ Finalizar Corte Atual", key=f"fim_{key_prefix}"):
-                            corte_atual = obter_corte_atual(maquina)
-                            if not isinstance(corte_atual, list):
-                                corte_atual = [corte_atual]
+                    if not interrompido:
+                        with col_fim:
+                            with stylable_container(
+                                key=f"green_{modo}_{maquina}",
+                                css_styles="""
+                                button {
+                                    background-color: #4CAF50;
+                                    color: black;
+                                }""",
+                            ):
+                                key_prefix = f"{modo}_{maquina.replace(' ', '_')}"
+                                if st.button(":material/Task_Alt: Finalizar Corte Atual", key=f"fim_{key_prefix}"):
+                                    corte_atual = obter_corte_atual(maquina)
+                                    if not isinstance(corte_atual, list):
+                                        corte_atual = [corte_atual]
 
-                            for trabalho in corte_atual:
-                                if isinstance(trabalho, dict):
-                                    caminho = trabalho.get("caminho")
-                                    if caminho:
-                                        excluir_imagem_supabase(caminho)
-                                elif isinstance(trabalho, str) and trabalho.startswith("http"):
-                                    excluir_imagem_supabase(trabalho)
+                                    for trabalho in corte_atual:
+                                        if isinstance(trabalho, dict):
+                                            caminho = trabalho.get("caminho")
+                                            if caminho:
+                                                excluir_imagem_supabase(caminho)
+                                        elif isinstance(trabalho, str) and trabalho.startswith("http"):
+                                            excluir_imagem_supabase(trabalho)
 
-                            finalizar_corte(maquina, usuario)
-                            st.success("Corte finalizado")
-                            st.session_state[f"status_corte_finalizado_{maquina}"] = True
-                            st.rerun(scope="fragment")
+                                    finalizar_corte(maquina, usuario)
+                                    st.success("Corte finalizado")
+                                    st.session_state[f"status_corte_finalizado_{maquina}"] = True
+                                    st.rerun(scope="fragment")
 
-                    with col_intr:
-                        key_prefix = f"{modo}_{maquina.replace(' ', '_')}"
-                        if st.button("⏸️ Parar Corte", key=f"parar_{key_prefix}"):
-                            st.session_state[f"abrir_dialogo_{maquina}"] = True
-                        if st.session_state.get(f"abrir_dialogo_{maquina}"):
-                            abrir_dialogo_interrupcao(maquina)
+                        with col_intr:
+                            with stylable_container(
+                                key=f"red_{modo}_{maquina}",
+                                css_styles="""
+                                button {
+                                    background-color: #c63948;
+                                    color: black;
+                                }""",
+                            ):
+                                key_prefix = f"{modo}_{maquina.replace(' ', '_')}"
+                                if st.button(":material/Pause: Parar Corte", key=f"parar_{key_prefix}"):
+                                    st.session_state[f"abrir_dialogo_{maquina}"] = True
+                                if st.session_state.get(f"abrir_dialogo_{maquina}", False):
+                                    abrir_dialogo_interrupcao(maquina)
+                                    st.session_state[f"abrir_dialogo_{maquina}"] = False
 
-                else:
-                    with col_ret:
-                        key_prefix = f"{modo}_{maquina.replace(' ', '_')}"
-                        if st.button("▶️ Retomar Corte", key=f"retomar_{key_prefix}"):
-                            retomar_interrupcao(maquina)
-                            atualizar_status_interrompido(maquina, False)
-                            st.success("Corte retomado.")
-                            st.rerun(scope="fragment")
+                    else:
+                        with col_ret:
+                            with stylable_container(
+                                key=f"blue_{modo}_{maquina}",
+                                css_styles="""
+                                button {
+                                    background-color: #5578aa;
+                                    color: black;
+                                }""",
+                            ):                        
+                                key_prefix = f"{modo}_{maquina.replace(' ', '_')}"
+                                if st.button(":material/Replay: Retomar Corte", key=f"retomar_{key_prefix}"):
+                                    retomar_interrupcao(maquina)
+                                    atualizar_status_interrompido(maquina, False)
+                                    st.success("Corte retomado.")
+                                    st.rerun(scope="fragment")
 
-                with col_pend:
-                    key_prefix = f"{modo}_{maquina.replace(' ', '_')}"
-                    if st.button("🔁 Retornar para Pendentes", key=f"ret_{key_prefix}"):
-                        retornar_para_pendentes(maquina)
-                        st.success("Trabalho retornado para pendentes")
-                        fn_pendentes = ss.get("atualizar_trabalhos_pendentes_fn")
-                        if fn_pendentes:
-                            fn_pendentes()
-                        st.rerun(scope="fragment")
+                    with col_pend:
+                        with stylable_container(
+                        key=f"yellow_{modo}_{maquina}",
+                        css_styles="""
+                        button {
+                            background-color: #dac925;
+                            color: black;
+                        }"""):                          
+                            key_prefix = f"{modo}_{maquina.replace(' ', '_')}"
+                            if st.button(":material/Undo: Retornar para Pendentes", key=f"ret_{key_prefix}"):
+                                retornar_para_pendentes(maquina)
+                                st.success("Trabalho retornado para pendentes")
+                                ss["atualizar_trabalhos_pendentes"] = ss.get("atualizar_trabalhos_pendentes", 0) + 1
+                                fn_pendentes = ss.get("atualizar_trabalhos_pendentes_fn")
+                                if fn_pendentes:
+                                    fn_pendentes()
+                                time.sleep(0.5)
+                                st.rerun(scope="fragment")
+                                
+                    st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
         else:
             st.markdown("_Nenhum corte em andamento_")
 
         if fila:
-            aba_visual, aba_ordenacao = st.tabs(["📄 Visualização Completa", "🔃 Ordem de Corte"])
+            aba_visual, aba_ordenacao = st.tabs(["📄 Visualização Completa", ":material/Repeat: Ordem de Corte"])
 
             with aba_visual:
-                st.markdown("### 📋 Fila de Espera")
+                st.markdown("### :material/Format_List_Bulleted: Fila de Espera")
 
                 dados_fila = []
                 for item in fila:
@@ -167,7 +242,7 @@ def exibir_maquina(maquina, modo="individual", dados_corte=None, fila_maquina=No
                 )
 
                 if cargo_empilhadeira:
-                    if st.button(f"💾 Salvar 'Local Separado' - {maquina}", key=f"btn_salvar_local_{modo}_{maquina}"):
+                    if st.button(f":material/Save: Salvar 'Local Separado' - {maquina}", key=f"btn_salvar_local_{modo}_{maquina}"):
                         updates = []
                         for idx, novo_valor in enumerate(edited_df["Local Separado"]):
                             id_item = dados_fila[idx]["ID"]
@@ -194,27 +269,45 @@ def exibir_maquina(maquina, modo="individual", dados_corte=None, fila_maquina=No
                     escolha = st.selectbox("Escolha o próximo CNC:", list(opcoes.keys()), key=f"escolha_{modo}_{maquina}")
                     col_iniciar, col_ret = st.columns(2)
                     with col_iniciar:
-                        key_prefix = f"{modo}_{maquina.replace(' ', '_')}"
-                        if st.button("▶️ Iniciar Corte", key=f"iniciar_{modo}_{maquina}"):
-                            if corte:
-                                st.warning("Finalize o corte atual antes de iniciar um novo.")
-                            else:
-                                iniciar_corte(maquina, opcoes[escolha])
-                                st.rerun(scope="fragment")
+                        with stylable_container(
+                            key=f"green(init)_{modo}_{maquina}",
+                            css_styles="""
+                            button {
+                                background-color: #4CAF50;
+                                color: black;
+                            }""",
+                        ):
+                            key_prefix = f"{modo}_{maquina.replace(' ', '_')}"
+                            if st.button(":material/Play_Circle: Iniciar Corte", key=f"iniciar_{modo}_{maquina}"):
+                                if corte:
+                                    st.warning("Finalize o corte atual antes de iniciar um novo.")
+                                else:
+                                    iniciar_corte(maquina, opcoes[escolha])
+                                    st.rerun(scope="fragment")
 
                     with col_ret:
-                        key_prefix = f"{modo}_{maquina.replace(' ', '_')}"
-                        if st.button("🔁 Retornar CNC para Pendentes", key=f"ret_fila_{modo}_{maquina}"):
-                            retornar_item_da_fila_para_pendentes(opcoes[escolha])
-                            st.success("Item da fila retornado para pendentes.")
+                        with stylable_container(
+                            key=f"yellow_fila_{modo}_{maquina}",
+                            css_styles="""
+                            button {
+                                background-color: #dac925;
+                                color: black;
+                            }"""):  
+                            key_prefix = f"{modo}_{maquina.replace(' ', '_')}"
+                            if st.button(":material/Undo: Retornar CNC para Pendentes", key=f"ret_fila_{modo}_{maquina}"):
+                                retornar_item_da_fila_para_pendentes(opcoes[escolha])
+                                st.success("Item da fila retornado para pendentes.")
+                                ss["atualizar_trabalhos_pendentes"] = ss.get("atualizar_trabalhos_pendentes", 0) + 1
+                                fn_pendentes = ss.get("atualizar_trabalhos_pendentes_fn")
+                                if fn_pendentes:
+                                    fn_pendentes()
+                                time.sleep(0.5)
+                                st.rerun(scope="fragment")
 
-                            fn_pendentes = ss.get("atualizar_trabalhos_pendentes_fn")
-                            if fn_pendentes:
-                                fn_pendentes()
-                            st.rerun(scope="fragment")
+                    st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
 
             with aba_ordenacao:
-                st.markdown("### 🔃 Ordem de Corte")
+                st.markdown("### :material/Repeat: Ordem de Corte")
 
                 mapa_itens = {}
                 elementos_drag = []
@@ -293,7 +386,7 @@ def exibir_maquina(maquina, modo="individual", dados_corte=None, fila_maquina=No
                         espessura_selecionada = st.selectbox("Espessura", espessuras, key=f"sel_espessura_{modo}_{maquina}")
 
                     with col_salvar:
-                        if st.button("💾 Salvar Nova Ordem de Corte", key=f"salvar_ordem_{modo}_{maquina}"):
+                        if st.button(":material/Save: Salvar Nova Ordem de Corte", key=f"salvar_ordem_{modo}_{maquina}"):
                             nova_ordem_ids = [mapa_itens[label] for label in nova_ordem[0]["items"]]
 
                             if (
@@ -391,6 +484,9 @@ def processar_pdfs(pdfs):
         else:
             inserir_trabalho_pendente(dados_trabalho)
 
+def novo_gatilho():
+    return str(uuid.uuid4())
+
 # Em auxiliares.py ou onde preferir
 MAQUINAS = ["LASER 1", "LASER 2", "LASER 3", "LASER 4", "LASER 5", "LASER 6"]
 from utils.db import adicionar_na_fila
@@ -407,7 +503,7 @@ def modal_enviar_cnc(item):
         key=f"modal_sel_maquina_{item_id}"
     )
 
-    if st.button("🚀 Confirmar envio", key=f"modal_btn_confirmar_envio_{item_id}"):
+    if st.button(":material/Redo: Confirmar envio", key=f"modal_btn_confirmar_envio_{item_id}"):
         adicionar_na_fila(maquina_escolhida, {
             "proposta": item["proposta"],
             "cnc": item["cnc"],
@@ -497,7 +593,7 @@ def renderizar_trabalhos_pendentes(gatilho=0):
                 col_add, col_del = st.columns(2)
                 with col_add:
                     if st.button(
-                        "➕ Enviar todos para a máquina",
+                        ":material/Redo: Enviar todos para a máquina",
                         key=f"btn_add_todos_{idx}_{grupo_hash}"
                     ):
                         trabalhos_para_enviar = []
@@ -531,6 +627,7 @@ def renderizar_trabalhos_pendentes(gatilho=0):
                         if fn_maquina:
                             fn_maquina()
                         
+                        time.sleep(0.5)
                         st.rerun(scope="fragment")
 
                 with col_del:

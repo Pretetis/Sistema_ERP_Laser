@@ -89,6 +89,7 @@ def iniciar_corte(maquina, id_fila):
         "gas": item.get("gas", None),
         "data_prevista": item["data_prevista"],
         "inicio": agora,
+        "repeticao": 1,
         "modificado_por": nome,
     }).execute(),mensagem="Erro ao iniciar o corte: ")
 
@@ -118,6 +119,7 @@ def finalizar_corte(maquina, nome):
         executar_seguro(lambda:supabase.table("corte_atual").update({
             "qtd_chapas": novo_qtd_chapas,
             "tempo_total": novo_tempo_str,
+            "repeticao": atual.get("repeticao", 0) + 1,
             "modificado_por": nome,
         }).eq("maquina", maquina).execute(),mensagem="Erro ao atualizar o corte: ")
 

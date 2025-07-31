@@ -1,5 +1,6 @@
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
+from streamlit import session_state as ss
 from utils.auth import verificar_autenticacao, logout
 verificar_autenticacao()
 
@@ -20,20 +21,31 @@ st.title("🛠️ Gestão de Produção")
 count = st_autorefresh(interval = 300000, key="autorefresh")
 
 if st.session_state.get("usuario_autenticado"):
-    if st.sidebar.button("🔒 Logout"):
-        logout()
+    col_logout, col_usuario, col_cargo = st.sidebar.columns([1, 2, 2])
+
+    with col_logout:
+        st.button("🔒 Logout", use_container_width=True)
+
+    with col_usuario:
+        with st.container(border=True):
+            st.markdown("🪪 **Usuário:** admin")
+
+    with col_cargo:
+        with st.container(border=True):
+            st.markdown("**Cargo:** Gerente")
+
     st.sidebar.divider()
 
 # =====================
 # Sidebar - Trabalhos Pendentes
 # =====================
 with st.sidebar:
-    st.title("📋 Trabalhos Pendentes")
+    st.title(":material/Format_List_Bulleted: Trabalhos Pendentes")
     container_pendentes = st.empty()
 
     def atualizar_trabalhos_pendentes():
         with container_pendentes:
-            renderizar_trabalhos_pendentes(gatilho=st.session_state.get("atualizar_trabalhos_pendentes", 0))
+            renderizar_trabalhos_pendentes(gatilho=ss.get("atualizar_trabalhos_pendentes", 0))
     
     st.session_state["atualizar_trabalhos_pendentes_fn"] = atualizar_trabalhos_pendentes
     atualizar_trabalhos_pendentes()
