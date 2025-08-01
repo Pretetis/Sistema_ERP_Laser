@@ -7,7 +7,7 @@ import uuid
 import pandas as pd
 import hashlib
 import re
-from datetime import date
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from streamlit_extras.stylable_container import stylable_container
 
@@ -21,6 +21,26 @@ from utils.db import (
     obter_status_interrompido, atualizar_status_interrompido
 )
 
+def tempo_para_minutos(tempo_str):
+    try:
+        h, m, s = map(int, tempo_str.split(":"))
+        return h * 60 + m + s / 60
+    except:
+        return 0
+    
+def somar_tempos(tempos):
+    total_segundos = 0
+    for tempo_str in tempos:
+        try:
+            h, m, s = map(int, tempo_str.split(":"))
+            total_segundos += h * 3600 + m * 60 + s
+        except:
+            pass
+    total = timedelta(seconds=total_segundos)
+    horas, resto = divmod(total.total_seconds(), 3600)
+    minutos = resto // 60
+    return f"{int(horas)}:{int(minutos):02d}"
+    
 def hash_grupo(grupo: str) -> str:
     return hashlib.md5(grupo.encode()).hexdigest()[:10]
 
@@ -137,7 +157,6 @@ def exibir_maquina(maquina, modo="individual", dados_corte=None, fila_maquina=No
                                             excluir_imagem_supabase(trabalho)
 
                                     finalizar_corte(maquina, usuario)
-                                    st.success("Corte finalizado")
                                     st.session_state[f"status_corte_finalizado_{maquina}"] = True
                                     st.rerun(scope="fragment")
                                 st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
@@ -578,10 +597,11 @@ def renderizar_trabalhos_pendentes(gatilho=0):
 
         titulo_linha1 = (
             f"🔹 {trabalho.get('proposta', 'N/D')} | {trabalho.get('espessura', 'N/D')} mm | "
-            f"{trabalho.get('material', 'N/D')} | x{len(itens)} CNCs | ⏱ {trabalho.get('tempo_total', 'N/D')}"
+            f"{trabalho.get('material', 'N/D')} | x{sum(int(i.get('qtd_chapas', 0)) for i in itens)} Chapas | ⏱ {somar_tempos([i.get('tempo_total', '00:00:00') for i in itens])} h"
         )
         data_fmt = "/".join(reversed(trabalho["data_prevista"].split("-")))
         gas_fmt = f"💨 {trabalho.get('gas')}" if trabalho.get("gas") else ""
+        
         titulo_linha2 = f"📅 {data_fmt} | ⚙️ {trabalho.get('processos')} | {gas_fmt}"
         titulo = f"{titulo_linha1}\n\n{titulo_linha2}"
 

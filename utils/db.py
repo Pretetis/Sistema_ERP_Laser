@@ -247,7 +247,13 @@ def timedelta_to_hms_string(td):
     minutes, seconds = divmod(remainder, 60)
     return f"{hours:02}:{minutes:02}:{seconds:02}"
 
+import json
 def normalizar_processos(val):
+    if isinstance(val, str):
+        try:
+            val = json.loads(val)  # Tenta transformar a string em lista
+        except json.JSONDecodeError:
+            val = [val.strip()] if val.strip() else []
     if isinstance(val, list) and val:
         return val
     return ["Corte Retornado"]
@@ -409,6 +415,7 @@ def mostrar_grafico_eventos(maquina, modo="individual"):
         key=f"grafico_{maquina}_{uuid.uuid4()}"
     )
 
+@st.cache_data(ttl=2)
 def obter_status_interrompido(maquina: str):
     result = executar_seguro(lambda:supabase.table("corte_atual").select("interrompido").eq("maquina", maquina).execute(),mensagem="Erro ao obter a interrupção: ")
     data = result.data

@@ -16,7 +16,7 @@ cargo_operador = cargo_usuario in ["Operador", "PCP", "Gerente"]
 cargo_empilhadeira = cargo_usuario in ["Empilhadeira", "Gerente"]
 
 st.set_page_config(page_title="Gestão de Corte", layout="wide")
-st.title("🛠️ Gestão de Produção")
+#st.title("🛠️ Gestão de Produção")
 
 count = st_autorefresh(interval = 300000, key="autorefresh")
 
@@ -24,15 +24,16 @@ if st.session_state.get("usuario_autenticado"):
     col_logout, col_usuario, col_cargo = st.sidebar.columns([1, 2, 2])
 
     with col_logout:
-        st.button("🔒 Logout", use_container_width=True)
+        if st.button(":material/Key_Off: Logout", use_container_width=True):
+            logout()
 
     with col_usuario:
         with st.container(border=True):
-            st.markdown("🪪 **Usuário:** admin")
+            st.markdown(":material/Id_Card: **Usuário:** " + usuario)
 
     with col_cargo:
         with st.container(border=True):
-            st.markdown("**Cargo:** Gerente")
+            st.markdown("**Cargo:** " + cargo_usuario)
 
     st.sidebar.divider()
 

@@ -63,4 +63,5 @@ def verificar_autenticacao(roles_permitidos=None):
 def logout():
     st.session_state.usuario_autenticado = False
     st.session_state.usuario = None
+    st.success("Usuário desconectado com sucesso.")
     st.rerun()  # recarrega a app, forçando voltar para tela inicial (login)

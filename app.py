@@ -21,6 +21,7 @@ with aba_login:
         submit = st.form_submit_button("Entrar")
 
         if submit:
+            username = username.strip().lower()
             resultado = login_usuario(username, senha)
             if resultado["success"]:
                 st.session_state.usuario_autenticado = True
@@ -45,6 +46,7 @@ with aba_cadastro:
         elif nova_senha != confirmar_senha:
             st.error("As senhas não coincidem. Tente novamente.")
         else:
+            novo_username = novo_username.strip().lower()
             resultado = cadastrar_usuario(nome, novo_username, nova_senha, cargo)
             if resultado["success"]:
                 st.success("Cadastro realizado! Aguarde aprovação do administrador.")
