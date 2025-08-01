@@ -103,7 +103,7 @@ def exibir_maquina(maquina, modo="individual", dados_corte=None, fila_maquina=No
             link_imagem = f"[:mag_right:]({caminho_img})" if caminho_img.startswith("http") else ""
 
             st.subheader(
-                f"**🔹 Corte Atual:** {repeticao} / {repeticao + total_chapas} chapas | CNC {corte.get('cnc', 'N/D')} {link_imagem} | "
+                f"**🔹 Corte Atual:** {repeticao} / {repeticao + total_chapas - 1} chapas | CNC {corte.get('cnc', 'N/D')} {link_imagem} | "
                 f"{corte.get('material', 'N/D')} | {corte.get('espessura', 'N/D')} mm"
             )
             if cargo_operador or cargo_pcp:
