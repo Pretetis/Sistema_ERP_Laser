@@ -140,6 +140,7 @@ def exibir_maquina(maquina, modo="individual", dados_corte=None, fila_maquina=No
                                     st.success("Corte finalizado")
                                     st.session_state[f"status_corte_finalizado_{maquina}"] = True
                                     st.rerun(scope="fragment")
+                                st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
 
                         with col_intr:
                             with stylable_container(
@@ -156,6 +157,7 @@ def exibir_maquina(maquina, modo="individual", dados_corte=None, fila_maquina=No
                                 if st.session_state.get(f"abrir_dialogo_{maquina}", False):
                                     abrir_dialogo_interrupcao(maquina)
                                     st.session_state[f"abrir_dialogo_{maquina}"] = False
+                                st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
 
                     else:
                         with col_ret:
@@ -173,6 +175,7 @@ def exibir_maquina(maquina, modo="individual", dados_corte=None, fila_maquina=No
                                     atualizar_status_interrompido(maquina, False)
                                     st.success("Corte retomado.")
                                     st.rerun(scope="fragment")
+                            st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
 
                     with col_pend:
                         with stylable_container(
