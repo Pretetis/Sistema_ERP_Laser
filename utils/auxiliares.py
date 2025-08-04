@@ -98,8 +98,9 @@ def renderizar_maquina_fragment(maquina, modo="individual",gatilho=0):
     fila_maquina = obter_fila(maquina)
     exibir_maquina(maquina, modo=modo, dados_corte=dados_corte, fila_maquina=fila_maquina)
 
+
 @st.fragment
-def renderizar_corte_atual_fragment(maquina, gatilho=0):
+def renderizar_corte_atual(maquina, gatilho=0):
     _ = gatilho
     _ = st.session_state.get(f"gatilho_atualizacao_corte_{maquina}", 0)
     dados_corte = obter_corte_atual(maquina)

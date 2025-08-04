@@ -4,7 +4,7 @@ from streamlit import session_state as ss
 from utils.auth import verificar_autenticacao, logout
 verificar_autenticacao()
 
-from utils.auxiliares import renderizar_trabalhos_pendentes, renderizar_corte_atual_fragment, renderizar_maquina_fragment
+from utils.auxiliares import renderizar_trabalhos_pendentes, renderizar_corte_atual, renderizar_maquina_fragment
 
 usuario = st.session_state.get("usuario", {}).get("nome", "desconhecido")
 cargo_usuario = st.session_state.get("usuario", {}).get("cargo", "")
@@ -68,7 +68,7 @@ for idx, maquina in enumerate(MAQUINAS):
 
         def atualizar_maquina(m=maquina):
             with container_corte:
-                renderizar_corte_atual_fragment(m, gatilho=ss.get(f"gatilho_corte_{m}", 0))
+                renderizar_corte_atual(m, gatilho=ss.get(f"gatilho_corte_{m}", 0))
             with container_fila:
                 renderizar_maquina_fragment(m, modo="fila_apenas", gatilho=ss.get(f"gatilho_fila_{m}", 0))
 
