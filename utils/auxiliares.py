@@ -11,9 +11,9 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from streamlit_extras.stylable_container import stylable_container
 
-from utils.supabase import supabase, excluir_imagem_supabase
-from utils.extracao import extrair_dados_por_posicao
-from utils.db import (
+from utils.storage import supabase, excluir_imagem_supabase
+from utils.pdf_extractor import extrair_dados_por_posicao
+from utils.database import (
     obter_fila, registrar_evento, mostrar_grafico_eventos, excluir_trabalho_por_cnc,
     obter_corte_atual, iniciar_corte, finalizar_corte, cnc_ja_existe,
     retornar_para_pendentes, retomar_interrupcao, adicionar_na_fila,
@@ -511,10 +511,8 @@ def novo_gatilho():
 
 # Em auxiliares.py ou onde preferir
 MAQUINAS = ["LASER 1", "LASER 2", "LASER 3", "LASER 4", "LASER 5", "LASER 6"]
-from utils.db import adicionar_na_fila
 
 def modal_enviar_cnc(item):
-    from utils.supabase import supabase  # garantir que está importado
 
     usuario = st.session_state.get("usuario", {}).get("nome", "desconhecido")
     item_id = item.get("id", "desconhecido")  # fallback caso não tenha id
@@ -560,8 +558,8 @@ def modal_enviar_cnc(item):
 @st.fragment
 def renderizar_trabalhos_pendentes(gatilho=0):
     from collections import defaultdict
-    from utils.db import excluir_trabalhos_grupo, adicionar_na_fila
-    from utils.supabase import supabase, excluir_imagem_supabase
+    from utils.database import excluir_trabalhos_grupo, adicionar_na_fila
+    from utils.storage import supabase, excluir_imagem_supabase
     from streamlit import session_state as ss
 
     contador = st.session_state.get("atualizar_trabalhos_pendentes", 0)
