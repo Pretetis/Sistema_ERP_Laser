@@ -4,7 +4,7 @@ from streamlit import session_state as ss
 from utils.auth import verificar_autenticacao, logout
 verificar_autenticacao()
 
-from utils.auxiliares import renderizar_trabalhos_pendentes, renderizar_corte_atual, renderizar_maquina_fragment
+from utils.auxiliares import renderizar_maquina_fragment, renderizar_trabalhos_pendentes
 
 usuario = st.session_state.get("usuario", {}).get("nome", "desconhecido")
 cargo_usuario = st.session_state.get("usuario", {}).get("cargo", "")
@@ -14,9 +14,6 @@ cargo_programador = cargo_usuario in ["Programador", "Gerente"]
 cargo_pcp = cargo_usuario in ["PCP", "Gerente"]
 cargo_operador = cargo_usuario in ["Operador", "PCP", "Gerente"]
 cargo_empilhadeira = cargo_usuario in ["Empilhadeira", "Gerente"]
-
-#logo_img = "images\logo-microns.png"
-#st.logo(logo_img, size="large")
 
 st.set_page_config(page_title="Gestão de Corte", layout="wide")
 #st.title("🛠️ Gestão de Produção")
@@ -63,14 +60,12 @@ containers_maquinas = {}
 
 for idx, maquina in enumerate(MAQUINAS):
     with abas_componentes[idx]:
-        container_corte = st.empty()
-        container_fila = st.empty()
+        container = st.empty()
+        containers_maquinas[maquina] = container
 
-        def atualizar_maquina(m=maquina):
-            with container_corte:
-                renderizar_corte_atual(m, gatilho=ss.get(f"gatilho_corte_{m}", 0))
-            with container_fila:
-                renderizar_maquina_fragment(m, modo="fila_apenas", gatilho=ss.get(f"gatilho_fila_{m}", 0))
+        def atualizar_maquina(m=maquina):  # 👈 importante para capturar corretamente
+            with containers_maquinas[m]:
+                renderizar_maquina_fragment(m, modo="individual", gatilho=0)
 
         st.session_state[f"atualizar_maquina_fn_{maquina}"] = atualizar_maquina
         atualizar_maquina()
