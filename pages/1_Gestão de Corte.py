@@ -15,8 +15,8 @@ cargo_pcp = cargo_usuario in ["PCP", "Gerente"]
 cargo_operador = cargo_usuario in ["Operador", "PCP", "Gerente"]
 cargo_empilhadeira = cargo_usuario in ["Empilhadeira", "Gerente"]
 
-logo_img = "images\logo-microns.png"
-st.logo(logo_img, size="large")
+#logo_img = "images\logo-microns.png"
+#st.logo(logo_img, size="large")
 
 st.set_page_config(page_title="Gestão de Corte", layout="wide")
 #st.title("🛠️ Gestão de Produção")
