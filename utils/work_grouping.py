@@ -1,11 +1,5 @@
 import pandas as pd
-import streamlit as st
-from utils.supabase import supabase
-
-PREFIXOS_CATEGORIAS = {
-    "aguardando_aprovacao": "aguardando_aprovacao",
-    "trabalhos_pendentes": "trabalhos_pendentes"
-}
+from utils.storage import supabase
 
 def carregar_trabalhos():
     trabalhos = {

@@ -7,7 +7,6 @@ from io import BytesIO
 from PIL import Image
 from datetime import datetime
 from zoneinfo import ZoneInfo
-from supabase import create_client, Client
 
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
@@ -87,19 +86,10 @@ def excluir_imagem_supabase(link_completo: str) -> bool:
     except Exception as e:
         print(f"Erro ao tentar excluir imagem: {e}")
         return False
-    
-# Baixar e salvar no disco
-def baixar_txt_para_disco(nome_arquivo: str, destino: Path) -> bool:
-    try:
-        conteudo = supabase.storage.from_(BUCKET_NAME).download(nome_arquivo)
-        destino.write_bytes(conteudo)
-        return True
-    except Exception:
-        return False
 
 import pandas as pd
 import streamlit as st
-from utils.supabase import supabase
+from utils.storage import supabase
 
 def historico_por_maquina():
     dados = supabase.table("historico_alteracoes")\

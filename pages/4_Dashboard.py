@@ -5,7 +5,7 @@ import plotly.express as px
 from utils.auth import verificar_autenticacao
 verificar_autenticacao()
 
-from utils.supabase import supabase
+from utils.storage import supabase
 
 st.set_page_config(page_title="Dashboard", layout="wide")
 

@@ -4,7 +4,7 @@ from PIL import Image
 from pathlib import Path
 from datetime import datetime
 
-from utils.supabase import supabase, BUCKET_NAME, SUPABASE_URL
+from utils.storage import supabase, BUCKET_NAME, SUPABASE_URL
 
 
 def gerar_preview_pdf_em_memoria(pdf_bytes: bytes) -> Image.Image:

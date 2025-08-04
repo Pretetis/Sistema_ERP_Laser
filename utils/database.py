@@ -1,4 +1,4 @@
-from utils.supabase import supabase
+from utils.storage import supabase
 
 import plotly.graph_objects as go
 import pandas as pd

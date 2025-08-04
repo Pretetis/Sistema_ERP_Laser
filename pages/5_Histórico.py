@@ -3,7 +3,7 @@ import streamlit as st
 from utils.auth import verificar_autenticacao
 verificar_autenticacao()
 
-from utils.supabase import historico_autorizacoes, historico_envios_para_laser, historico_por_maquina
+from utils.storage import historico_autorizacoes, historico_envios_para_laser, historico_por_maquina
 
 st.set_page_config(page_title="Histórico", layout="wide")
 

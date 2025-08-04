@@ -2,15 +2,13 @@ import streamlit as st
 import sys
 import gc
 from pathlib import Path
-import pandas as pd
-from datetime import date
 
 from utils.auth import verificar_autenticacao
 verificar_autenticacao(roles_permitidos=["Programador", "Gerente"])
 
-from utils.Junta_Trabalhos import carregar_trabalhos
-from utils.db import inserir_trabalho_pendente, atualizar_trabalho_pendente, excluir_trabalhos_grupo, excluir_trabalho_por_cnc
-from utils.supabase import excluir_imagem_supabase
+from utils.work_grouping import carregar_trabalhos
+from utils.database import atualizar_trabalho_pendente, excluir_trabalhos_grupo
+from utils.storage import excluir_imagem_supabase
 from utils.auxiliares import processar_pdfs, confirmar_substituicao_cnc
 
 
