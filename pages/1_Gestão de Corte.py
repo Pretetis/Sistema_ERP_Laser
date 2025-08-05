@@ -2,6 +2,7 @@ import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 from streamlit import session_state as ss
 from utils.auth import verificar_autenticacao, logout
+from utils.storage import supabase
 verificar_autenticacao()
 
 from utils.auxiliares import renderizar_maquina_fragment, renderizar_trabalhos_pendentes
@@ -36,6 +37,17 @@ if st.session_state.get("usuario_autenticado"):
             st.markdown("**Cargo:** " + cargo_usuario)
 
     st.sidebar.divider()
+
+import time
+
+start = time.time()
+corte = supabase.table("corte_atual").select("*").eq("maquina", MAQUINAS[0]).execute().data
+st.write(f"obter_corte_atual levou {time.time() - start:.2f}s")
+
+start = time.time()
+fila = supabase.table("fila_maquinas").select("*").eq("maquina", MAQUINAS[0]).execute().data
+st.write(f"obter_fila_corte levou {time.time() - start:.2f}s")
+
 
 # =====================
 # Sidebar - Trabalhos Pendentes
