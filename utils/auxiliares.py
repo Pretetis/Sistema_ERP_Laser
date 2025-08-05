@@ -155,11 +155,7 @@ def exibir_maquina(maquina, modo="individual", dados_corte=None, fila_maquina=No
                         ):
                             if st.button(":material/Task_Alt: Finalizar", key=f"{key_prefix}_btn_finalizar"):
                                 with st.spinner("Finalizando corte..."):
-                                    start = time.time()
                                     finalizar_corte(maquina, usuario)
-                                    duracao = time.time() - start
-                                    st.success(f"Corte finalizado. ⏱️ Tempo: {duracao:.2f}s")
-                                    print(f"Finalização levou {duracao:.2f}s")
                                     ss[f"status_corte_finalizado_{maquina}"] = True
                                     st.rerun(scope="fragment")
 
@@ -304,11 +300,7 @@ def exibir_maquina(maquina, modo="individual", dados_corte=None, fila_maquina=No
                                 if corte:
                                     st.warning("Finalize o corte atual antes de iniciar um novo.")
                                 else:
-                                    start = time.time()
                                     iniciar_corte(maquina, opcoes[escolha])
-                                    duracao = time.time() - start
-                                    st.toast(f"Corte iniciado em {duracao:.2f}s")
-                                    print(f"Início levou {duracao:.2f}s")
                                     st.rerun(scope="fragment")
 
                     with col_ret:
