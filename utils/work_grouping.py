@@ -15,14 +15,14 @@ def carregar_trabalhos():
         df_autorizado = pd.DataFrame()
         df_nao_autorizado = pd.DataFrame()
     else:
-        df_autorizado = df[df["autorizado"] == True]
-        df_nao_autorizado = df[df["autorizado"] != True]
+        df_autorizado = df[df["autorizado"] == True].copy()
+        df_nao_autorizado = df[df["autorizado"] != True].copy()
 
     for status, df_base in [("aguardando_aprovacao", df_nao_autorizado), ("trabalhos_pendentes", df_autorizado)]:
         if df_base.empty:
             continue
 
-        df_base["tempo_total"] = pd.to_timedelta(df_base["tempo_total"], errors="coerce")
+        df_base.loc[:, "tempo_total"] = pd.to_timedelta(df_base["tempo_total"], errors="coerce")
 
         trabalhos_categoria = []
         for grupo_nome, subdf in df_base.groupby("grupo"):
@@ -31,7 +31,7 @@ def carregar_trabalhos():
             tempo_formatado = f"{segundos // 3600:02}:{(segundos % 3600) // 60:02}:{segundos % 60:02}"
 
             detalhes = subdf.copy()
-            detalhes["tempo_total"] = detalhes["tempo_total"].apply(
+            detalhes.loc[:, "tempo_total"] = detalhes["tempo_total"].apply(
                 lambda x: (
                     f"{int(x.total_seconds()) // 3600:02}:"
                     f"{(int(x.total_seconds()) % 3600) // 60:02}:"

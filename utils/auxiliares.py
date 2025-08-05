@@ -510,13 +510,15 @@ MAQUINAS = ["LASER 1", "LASER 2", "LASER 3", "LASER 4", "LASER 5", "LASER 6"]
 
 def modal_enviar_cnc(item):
 
+    item_str = str(item)  # transforma o dicionário em string
+    item_hash = hashlib.md5(item_str.encode()).hexdigest()  # gera um hash único e estável
     usuario = st.session_state.get("usuario", {}).get("nome", "desconhecido")
     item_id = item.get("id", "desconhecido")  # fallback caso não tenha id
 
     maquina_escolhida = st.selectbox(
         "Selecione a máquina",
         MAQUINAS,
-        key=f"modal_sel_maquina_{item_id}"
+        key=f"btn_enviar_cnc_{item_hash}"
     )
 
     if st.button(":material/Redo: Confirmar envio", key=f"modal_btn_confirmar_envio_{item_id}"):

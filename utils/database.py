@@ -334,7 +334,7 @@ def mostrar_grafico_eventos(maquina, modo="individual"):
         "finalizado": 0,
         "cancelado": 0,
         "parado": -1
-    }).fillna(method='ffill')
+    }).ffill()
 
     df = df.sort_values("timestamp")
 
