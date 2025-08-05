@@ -89,13 +89,14 @@ def abrir_dialogo_interrupcao(maquina):
             st.rerun()
 
 @st.fragment
-def renderizar_maquina_fragment(maquina, modo="individual",gatilho=0):
-    _ = gatilho  # força rerender
-    # 👇 Esta linha é OBRIGATÓRIA: obriga o fragmento a reagir quando o valor mudar
+def renderizar_maquina_fragment(maquina, modo="individual", gatilho=0, fila=None, corte=None):
+    _ = gatilho  # força rerender pelo valor externo
     _ = st.session_state.get(f"gatilho_atualizacao_{maquina}", 0)
 
-    dados_corte = obter_corte_atual(maquina)
-    fila_maquina = obter_fila(maquina)
+    # Só carrega do banco se não vier como argumento
+    dados_corte = corte or obter_corte_atual(maquina)
+    fila_maquina = fila or obter_fila(maquina)
+
     exibir_maquina(maquina, modo=modo, dados_corte=dados_corte, fila_maquina=fila_maquina)
 
 

@@ -108,6 +108,20 @@ df_eventos = carregar_eventos()
 df_tempos = calcular_tempos_personalizados(df_eventos)
 maquinas = sorted(df_eventos["maquina"].dropna().unique())
 
+st.sidebar.header("Filtro de Data")
+
+data_inicio = st.sidebar.date_input("Data Início", value=df_eventos["timestamp"].min().date(), format="DD/MM/YYYY")
+data_fim = st.sidebar.date_input("Data Fim", value=df_eventos["timestamp"].max().date(), format="DD/MM/YYYY")
+
+# Garantir que a data final seja maior ou igual à inicial
+if data_fim < data_inicio:
+    st.sidebar.error("Data final não pode ser anterior à data inicial.")
+    st.stop()
+
+# Filtrar eventos com base nas datas selecionadas
+mask = (df_eventos["timestamp"].dt.date >= data_inicio) & (df_eventos["timestamp"].dt.date <= data_fim)
+df_eventos = df_eventos[mask]
+
 for maquina in maquinas:
     with st.container(border=True):
         st.subheader(maquina)

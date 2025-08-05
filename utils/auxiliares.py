@@ -98,24 +98,32 @@ def renderizar_maquina_fragment(maquina, modo="individual",gatilho=0):
     fila_maquina = obter_fila(maquina)
     exibir_maquina(maquina, modo=modo, dados_corte=dados_corte, fila_maquina=fila_maquina)
 
+
 def exibir_maquina(maquina, modo="individual", dados_corte=None, fila_maquina=None):
-    if st.session_state.get(f"status_corte_finalizado_{maquina}"):
-        st.session_state[f"status_corte_finalizado_{maquina}"] = False
-    usuario = st.session_state.get("usuario", {}).get("nome", "desconhecido")
-    cargo_usuario = st.session_state.get("usuario", {}).get("cargo", "")
+    ss = st.session_state
+    usuario = ss.get("usuario", {}).get("nome", "desconhecido")
+    cargo_usuario = ss.get("usuario", {}).get("cargo", "")
+
+    key_prefix = f"{modo}_{maquina.replace(' ', '_')}"
+    key_base = f"{modo}_{maquina.replace(' ', '_')}"
 
     cargo_pcp = cargo_usuario in ["PCP", "Gerente"]
     cargo_operador = cargo_usuario in ["Operador", "Gerente"]
     cargo_empilhadeira = cargo_usuario in ["Empilhadeira", "Gerente"]
-    key_prefix = f"{modo}_{maquina.replace(' ', '_')}"
-    key_base = f"{modo}_{maquina.replace(' ', '_')}"
+
+    corte = dados_corte
+    fila = fila_maquina
+
+    # Zera flag de finalização se houver
+    if ss.get(f"status_corte_finalizado_{maquina}"):
+        ss[f"status_corte_finalizado_{maquina}"] = False
 
     with st.container(border=True):
         st.markdown(f"## :material/Precision_Manufacturing: {maquina}")
 
-        corte = dados_corte if dados_corte is not None else obter_corte_atual(maquina)
-        fila = fila_maquina if fila_maquina is not None else obter_fila(maquina)
-
+        # =======================
+        # CORTE ATUAL
+        # =======================
         if corte:
             repeticao = corte.get("repeticao", 1)
             total_chapas = corte.get("qtd_chapas", 0)
@@ -126,98 +134,86 @@ def exibir_maquina(maquina, modo="individual", dados_corte=None, fila_maquina=No
                 f"**🔹 Corte Atual:** {repeticao} / {repeticao + total_chapas - 1} chapas | CNC {corte.get('cnc', 'N/D')} {link_imagem} | "
                 f"{corte.get('material', 'N/D')} | {corte.get('espessura', 'N/D')} mm"
             )
+
             if cargo_operador or cargo_pcp:
                 interrompido = obter_status_interrompido(maquina)
-
+                
                 with st.container(border=True):
                     col_fim, col_intr, col_ret, col_pend = st.columns(4)
+                    st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
 
-                    if not interrompido:
-                        with col_fim:
-                            with stylable_container(
-                                key=f"green_{modo}_{maquina}",
-                                css_styles="""
+                if not interrompido:
+                    with col_fim:
+                        with stylable_container(
+                            key=f"{key_prefix}_green_btn",
+                            css_styles="""
                                 button {
                                     background-color: #4CAF50;
                                     color: black;
-                                }""",
-                            ):
-                                key_prefix = f"{modo}_{maquina.replace(' ', '_')}"
-                                if st.button(":material/Task_Alt: Finalizar Corte Atual", key=f"fim_{key_prefix}"):
-                                    corte_atual = obter_corte_atual(maquina)
-                                    if not isinstance(corte_atual, list):
-                                        corte_atual = [corte_atual]
-
-                                    for trabalho in corte_atual:
-                                        if isinstance(trabalho, dict):
-                                            caminho = trabalho.get("caminho")
-                                            if caminho:
-                                                excluir_imagem_supabase(caminho)
-                                        elif isinstance(trabalho, str) and trabalho.startswith("http"):
-                                            excluir_imagem_supabase(trabalho)
-
+                                }
+                            """
+                        ):
+                            if st.button(":material/Task_Alt: Finalizar", key=f"{key_prefix}_btn_finalizar"):
+                                with st.spinner("Finalizando corte..."):
                                     finalizar_corte(maquina, usuario)
-                                    st.session_state[f"status_corte_finalizado_{maquina}"] = True
+                                    ss[f"status_corte_finalizado_{maquina}"] = True
                                     st.rerun(scope="fragment")
-                                st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
 
-                        with col_intr:
-                            with stylable_container(
-                                key=f"red_{modo}_{maquina}",
-                                css_styles="""
+                    with col_intr:
+                        with stylable_container(
+                            key=f"{key_prefix}_red_btn",
+                            css_styles="""
                                 button {
                                     background-color: #c63948;
                                     color: black;
-                                }""",
-                            ):
-                                key_prefix = f"{modo}_{maquina.replace(' ', '_')}"
-                                if st.button(":material/Pause: Parar Corte", key=f"parar_{key_prefix}"):
-                                    st.session_state[f"abrir_dialogo_{maquina}"] = True
-                                if st.session_state.get(f"abrir_dialogo_{maquina}", False):
-                                    abrir_dialogo_interrupcao(maquina)
-                                    st.session_state[f"abrir_dialogo_{maquina}"] = False
-                                st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
+                                }
+                            """
+                        ):
+                            if st.button(":material/Pause: Parar", key=f"{key_prefix}_btn_parar"):
+                                ss[f"abrir_dialogo_{maquina}"] = True
 
-                    else:
-                        with col_ret:
-                            with stylable_container(
-                                key=f"blue_{modo}_{maquina}",
-                                css_styles="""
+                        if ss.get(f"abrir_dialogo_{maquina}", False):
+                            abrir_dialogo_interrupcao(maquina)
+                            ss[f"abrir_dialogo_{maquina}"] = False
+
+                else:
+                    with col_ret:
+                        with stylable_container(
+                            key=f"{key_prefix}_blue_btn",
+                            css_styles="""
                                 button {
                                     background-color: #5578aa;
                                     color: black;
-                                }""",
-                            ):                        
-                                key_prefix = f"{modo}_{maquina.replace(' ', '_')}"
-                                if st.button(":material/Replay: Retomar Corte", key=f"retomar_{key_prefix}"):
+                                }
+                            """
+                        ):                        
+                            if st.button(":material/Replay: Retomar", key=f"{key_prefix}_btn_retomar"):
+                                with st.spinner("Retomando corte..."):
                                     retomar_interrupcao(maquina)
                                     atualizar_status_interrompido(maquina, False)
                                     st.success("Corte retomado.")
                                     st.rerun(scope="fragment")
-                            st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
 
-                    with col_pend:
-                        with stylable_container(
-                        key=f"yellow_{modo}_{maquina}",
-                        css_styles="""
-                        button {
-                            background-color: #dac925;
-                            color: black;
-                        }"""):                          
-                            key_prefix = f"{modo}_{maquina.replace(' ', '_')}"
-                            if st.button(":material/Undo: Retornar para Pendentes", key=f"ret_{key_prefix}"):
+                with col_pend:
+                    with stylable_container(
+                            key=f"{key_prefix}_yellow_btn",
+                            css_styles="""
+                                button {
+                                    background-color: #dac925;
+                                    color: black;
+                                }
+                            """
+                    ):                            
+                        if st.button(":material/Undo: Retornar", key=f"{key_prefix}_btn_retornar"):
+                            with st.spinner("Retornando CNC para pendentes..."):
                                 retornar_para_pendentes(maquina)
-                                st.success("Trabalho retornado para pendentes")
                                 ss["atualizar_trabalhos_pendentes"] = ss.get("atualizar_trabalhos_pendentes", 0) + 1
                                 fn_pendentes = ss.get("atualizar_trabalhos_pendentes_fn")
                                 if fn_pendentes:
                                     fn_pendentes()
-                                time.sleep(0.5)
                                 st.rerun(scope="fragment")
-                                
-                    st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
         else:
-            st.markdown("_Nenhum corte em andamento_")
+            st.markdown("_Nenhum corte em andamento._")
 
         if fila:
             aba_visual, aba_ordenacao = st.tabs(["📄 Visualização Completa", ":material/Repeat: Ordem de Corte"])
