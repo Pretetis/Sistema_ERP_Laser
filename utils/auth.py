@@ -16,6 +16,7 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def cadastrar_usuario(nome, username, senha, cargo):
     try:
+        # encriptografa a senha
         senha_hash = bcrypt.hashpw(senha.encode(), bcrypt.gensalt()).decode('utf-8')
 
         data = {
@@ -23,7 +24,7 @@ def cadastrar_usuario(nome, username, senha, cargo):
             "username": username,
             "senha_hash": senha_hash,
             "cargo": cargo,
-            "aprovado": False  # precisa ser aprovado manualmente
+            "aprovado": False  # precisa ser aprovado manualmente no supabase
         }
 
         resposta = supabase.table("usuarios").insert(data).execute()

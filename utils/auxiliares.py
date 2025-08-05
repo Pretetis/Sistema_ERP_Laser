@@ -6,12 +6,11 @@ import time
 import uuid
 import pandas as pd
 import hashlib
-import re
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from pathlib import Path
 from streamlit_extras.stylable_container import stylable_container
 
-from utils.storage import supabase, excluir_imagem_supabase
+from utils.storage import supabase
 from utils.pdf_extractor import extrair_dados_por_posicao
 from utils.database import (
     obter_fila, registrar_evento, mostrar_grafico_eventos, excluir_trabalho_por_cnc,
@@ -44,6 +43,7 @@ def somar_tempos(tempos):
 def hash_grupo(grupo: str) -> str:
     return hashlib.md5(grupo.encode()).hexdigest()[:10]
 
+#cria o modal para captura dos motivos e horarios da interrupção
 @st.dialog("Interrupção de Corte")
 def abrir_dialogo_interrupcao(maquina):
     nome = st.session_state.get("usuario", {}).get("nome", "desconhecido")
@@ -88,6 +88,7 @@ def abrir_dialogo_interrupcao(maquina):
             st.success("Interrupção registrada.")
             st.rerun()
 
+# renderiza o fragmento da máquina, atualizando quando o gatilho mudar
 @st.fragment
 def renderizar_maquina_fragment(maquina, modo="individual",gatilho=0):
     _ = gatilho  # força rerender
@@ -98,15 +99,18 @@ def renderizar_maquina_fragment(maquina, modo="individual",gatilho=0):
     fila_maquina = obter_fila(maquina)
     exibir_maquina(maquina, modo=modo, dados_corte=dados_corte, fila_maquina=fila_maquina)
 
-
+# exibe o painel completo da máquina, com controles e fila
 def exibir_maquina(maquina, modo="individual", dados_corte=None, fila_maquina=None):
+    #coleta variáveis do usuário
     ss = st.session_state
     usuario = ss.get("usuario", {}).get("nome", "desconhecido")
     cargo_usuario = ss.get("usuario", {}).get("cargo", "")
 
+    #cria as chaves únicas para os componentes, garantindo que não conflitem por duplicatas
     key_prefix = f"{modo}_{maquina.replace(' ', '_')}"
     key_base = f"{modo}_{maquina.replace(' ', '_')}"
 
+    #carrega os tipos de cargo para ocultar funções do usuário
     cargo_pcp = cargo_usuario in ["PCP", "Gerente"]
     cargo_operador = cargo_usuario in ["Operador", "Gerente"]
     cargo_empilhadeira = cargo_usuario in ["Empilhadeira", "Gerente"]
@@ -125,6 +129,7 @@ def exibir_maquina(maquina, modo="individual", dados_corte=None, fila_maquina=No
         # CORTE ATUAL
         # =======================
         if corte:
+            #Coleta dados do corte atual para exibir no subheader
             repeticao = corte.get("repeticao", 1)
             total_chapas = corte.get("qtd_chapas", 0)
             caminho_img = corte.get("caminho", "")
@@ -135,13 +140,16 @@ def exibir_maquina(maquina, modo="individual", dados_corte=None, fila_maquina=No
                 f"{corte.get('material', 'N/D')} | {corte.get('espessura', 'N/D')} mm"
             )
 
+            #os controles da máquina são exibidos apenas se o usuário for operador ou pcp
             if cargo_operador or cargo_pcp:
                 interrompido = obter_status_interrompido(maquina)
                 
+                #cria uma linha envolta dos botões de controle para os manter visualmente separados do restante da máquina
                 with st.container(border=True):
                     col_fim, col_intr, col_ret, col_pend = st.columns(4)
                     st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
 
+                # se o corte não estiver interrompido, exibe os botões de finalizar e interromper
                 if not interrompido:
                     with col_fim:
                         with stylable_container(
@@ -176,6 +184,7 @@ def exibir_maquina(maquina, modo="individual", dados_corte=None, fila_maquina=No
                             abrir_dialogo_interrupcao(maquina)
                             ss[f"abrir_dialogo_{maquina}"] = False
 
+                # se o corte estiver interrompido, exibe os botões de retomar
                 else:
                     with col_ret:
                         with stylable_container(
@@ -194,6 +203,7 @@ def exibir_maquina(maquina, modo="individual", dados_corte=None, fila_maquina=No
                                     st.success("Corte retomado.")
                                     st.rerun(scope="fragment")
 
+                # o corte sempre tem a opção de cancelar e retornar para pendentes
                 with col_pend:
                     with stylable_container(
                             key=f"{key_prefix}_yellow_btn",
@@ -216,11 +226,13 @@ def exibir_maquina(maquina, modo="individual", dados_corte=None, fila_maquina=No
             st.markdown("_Nenhum corte em andamento._")
 
         if fila:
+            #cria as abas para alternar entre visualização completa e ordenação
             aba_visual, aba_ordenacao = st.tabs(["📄 Visualização Completa", ":material/Repeat: Ordem de Corte"])
 
             with aba_visual:
                 st.markdown("### :material/Format_List_Bulleted: Fila de Espera")
 
+                # exibe a tabela da fila, mantendo apenas o campo editável "Local Separado"
                 dados_fila = []
                 for item in fila:
                     dados_fila.append({
@@ -259,6 +271,7 @@ def exibir_maquina(maquina, modo="individual", dados_corte=None, fila_maquina=No
                     key=f"data_editor_{key_prefix}"
                 )
 
+                # apenas os usuários com cargo de empilhadeira podem editar o campo "Local Separado"
                 if cargo_empilhadeira:
                     if st.button(f":material/Save: Salvar 'Local Separado' - {maquina}", key=f"btn_salvar_local_{modo}_{maquina}"):
                         updates = []
@@ -282,6 +295,7 @@ def exibir_maquina(maquina, modo="individual", dados_corte=None, fila_maquina=No
                     f"{item['proposta']} | CNC {item['cnc']}": item['id']
                     for item in fila
                 }
+                # pcp ou operador podem iniciar um corte ou retornar um CNC para pendentes
                 if cargo_operador or cargo_pcp:
                     key_prefix = f"{modo}_{maquina.replace(' ', '_')}"
                     escolha = st.selectbox("Escolha o próximo CNC:", list(opcoes.keys()), key=f"escolha_{modo}_{maquina}")
@@ -322,6 +336,7 @@ def exibir_maquina(maquina, modo="individual", dados_corte=None, fila_maquina=No
                                 time.sleep(0.5)
                                 st.rerun(scope="fragment")
 
+                    #markdown para espaçamento visual (botões estão colados an borda do container)
                     st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
 
             with aba_ordenacao:
@@ -331,13 +346,14 @@ def exibir_maquina(maquina, modo="individual", dados_corte=None, fila_maquina=No
                 elementos_drag = []
 
                 for item in fila:
-                    # Garante unicidade no rótulo com ID oculto
+                    # cria o drag and drop das colunas para rearranjar a ordem de corte de maneira dinamica
                     label = f"""📌 Proposta: {item['proposta']} | 📄 CNC: {item['cnc']} | 🧪 Material: {item['material']} | Esp: {item['espessura']} mm  
-            📦 Qtd: {item['qtd_chapas']} | ⏱️ Tempo: {item.get('tempo_total', '')} | ID: {item['id']}"""  # ID invisível para diferenciar
+                    📦 Qtd: {item['qtd_chapas']} | ⏱️ Tempo: {item.get('tempo_total', '')} | ID: {item['id']}"""  
 
                     elementos_drag.append(label)
                     mapa_itens[label] = item["id"]
 
+                # Cria o estilo personalizado para o componente de ordenação
                 estilo_azul_escuro = """
                 .sortable-component {
                     background-color: #0F1117;
@@ -373,13 +389,15 @@ def exibir_maquina(maquina, modo="individual", dados_corte=None, fila_maquina=No
                 }
                 """
 
+                #armazena a nova ordem de corte
                 nova_ordem = sort_items(
                     [{'header': f'📋 Fila da {maquina}', 'items': elementos_drag}],
                     multi_containers=True,
                     custom_style=estilo_azul_escuro,
                     key=f"sortable_{key_base}"  # <- chave única aqui
                 )
-
+            
+                # cria um campo onde o PCP pode selecionar a proposta, material e espessura para criar uma nova ordem de corte (evitando rearranjar a fila manualmente)
                 if cargo_pcp:
                     col_sel1, col_sel2, col_sel3, col_salvar = st.columns([2, 2, 2, 2])
 
@@ -437,10 +455,11 @@ def exibir_maquina(maquina, modo="individual", dados_corte=None, fila_maquina=No
         else:
             st.divider()
             st.markdown("_Fila vazia_")
-
+    #gera um gráfico para analisar o funcionamento da máquina (inspirado em satisfactory)
     with st.expander("Gerar Gráfico da Máquina", expanded=True):
         mostrar_grafico_eventos(maquina)
 
+# cria modal para confirmar a substituição de um CNC já existente na página 3
 @st.dialog("Substituir CNC Existente")
 def confirmar_substituicao_cnc(dados_trabalho):
     cnc = dados_trabalho["cnc"]

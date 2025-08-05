@@ -28,6 +28,7 @@ st.markdown("""
 # =====================
 # 1. Upload dos PDFs
 # =====================
+
 st.markdown("Faça o upload dos arquivos .pdf dos programas CNC.")
 # Inicializa a flag no primeiro carregamento
 if "limpar_upload" not in st.session_state:
@@ -37,6 +38,7 @@ if "limpar_upload" not in st.session_state:
 uploader_key = "uploader_reset" if st.session_state.limpar_upload else "uploader"
 
 pdfs = st.file_uploader("Envie os PDFs", type="pdf", accept_multiple_files=True, key=uploader_key)
+
 # Verifica se há CNCs aguardando confirmação
 if "cnc_para_confirmar" in st.session_state:
     for dados in st.session_state["cnc_para_confirmar"]:
@@ -78,12 +80,14 @@ if not trabalhos:
     st.info("Nenhum trabalho pendente no momento.")
 else:
     for trabalho in trabalhos:
+        #cria o container expandivel para cada trabalho com o grupo como título
         with st.expander(
             f"🔹 {trabalho['proposta']} | {trabalho['espessura']} mm | {trabalho['material']} "
             f"| x {trabalho['qtd_total']} | ⏱ {trabalho['tempo_total']}"
         ):
+            #campo para selecionar a data do processo
             data_processo = st.date_input("Data", key=f"data_{trabalho['grupo']}", format="DD/MM/YYYY")
-
+            #seleção de gás e processos
             processos_possiveis = ["Dobra", "Usinagem", "Solda", "Gravação", "Galvanização", "Pintura"]
             gas_escolhido = st.radio(
                 "Selecione o gás",
@@ -92,7 +96,7 @@ else:
                 key=f"gas_{trabalho['grupo']}",
                 horizontal=True
             )
-
+            # Se o gás for diferente de "Padrão", não armazena valor para o Operador decidir oque usar
             gas_final = None if gas_escolhido == "Padrão" else gas_escolhido
 
             col_processos = st.columns(len(processos_possiveis))
@@ -101,6 +105,7 @@ else:
                 if col_processos[i].checkbox(proc, key=f"proc_{trabalho['grupo']}_{proc}")
             ]
 
+            # Exibe detalhes de cada trabalho pendente
             for item in trabalho["detalhes"]:
                 with st.container(border=True):
                     col1, col2 = st.columns([2, 2])

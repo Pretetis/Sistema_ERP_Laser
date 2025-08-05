@@ -16,6 +16,7 @@ def carregar_eventos():
     df["timestamp"] = pd.to_datetime(df["timestamp"])
     return df
 
+#classifica o tiop de evento que ocorreu
 def classificar_transicao(prev_tipo, atual_tipo):
     if prev_tipo in ["iniciado", "retomado"] and atual_tipo in ["parado", "cancelado"]:
         return "Tempo de Corte"

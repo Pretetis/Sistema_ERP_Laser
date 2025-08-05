@@ -2,16 +2,17 @@ import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 from streamlit import session_state as ss
 from utils.auth import verificar_autenticacao, logout
-from utils.storage import supabase
-import time
 verificar_autenticacao()
 
 from utils.auxiliares import renderizar_maquina_fragment, renderizar_trabalhos_pendentes
 
+#carrega o nome e o cargo do usuário autenticado
 usuario = st.session_state.get("usuario", {}).get("nome", "desconhecido")
 cargo_usuario = st.session_state.get("usuario", {}).get("cargo", "")
+
 MAQUINAS = ["LASER 1", "LASER 2", "LASER 3", "LASER 4", "LASER 5", "LASER 6"]
 
+#carrega os tipos de cargo para ocultar funções do usuário
 cargo_programador = cargo_usuario in ["Programador", "Gerente"]
 cargo_pcp = cargo_usuario in ["PCP", "Gerente"]
 cargo_operador = cargo_usuario in ["Operador", "PCP", "Gerente"]
@@ -20,8 +21,10 @@ cargo_empilhadeira = cargo_usuario in ["Empilhadeira", "Gerente"]
 st.set_page_config(page_title="Gestão de Corte", layout="wide")
 #st.title("🛠️ Gestão de Produção")
 
+# recarrega a página a cada 5 minutos
 count = st_autorefresh(interval = 300000, key="autorefresh")
 
+# exibe nome e cargo do usuário e coloca opção de logout na barra lateral
 if st.session_state.get("usuario_autenticado"):
     col_logout, col_usuario, col_cargo = st.sidebar.columns([1, 2, 2])
 
@@ -65,7 +68,7 @@ for idx, maquina in enumerate(MAQUINAS):
         container = st.empty()
         containers_maquinas[maquina] = container
 
-        def atualizar_maquina(m=maquina):  # 👈 importante para capturar corretamente
+        def atualizar_maquina(m=maquina):
             with containers_maquinas[m]:
                 renderizar_maquina_fragment(m, modo="individual", gatilho=0)
 

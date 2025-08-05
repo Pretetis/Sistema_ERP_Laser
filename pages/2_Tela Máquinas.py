@@ -14,7 +14,10 @@ SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # Escolher turno aqui
-tipo_turno_atual = 2  # 👈 Altere para 1, 2 ou 3
+# turno 1 = 24 hrs
+# turno 2 = 6h às 17h33
+# turno 3 = 21h às 15h48
+tipo_turno_atual = 2  # Altere para 1, 2 ou 3,
 
 maquinas = [f"LASER {i}" for i in range(1, 7)]
 nomes_exibicao = [f"LASER {i}" for i in range(1, 7)]
