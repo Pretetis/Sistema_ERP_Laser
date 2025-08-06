@@ -403,7 +403,7 @@ def mostrar_grafico_eventos(maquina, modo="individual"):
             range=[-1.5, 1.5]
         ),
         yaxis_title="Status",
-        showlegend=False,  # 👈 desativa legenda do gráfico
+        showlegend=False,  # desativa legenda do gráfico
         height=300
     )
 
